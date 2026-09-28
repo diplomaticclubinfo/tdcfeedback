@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Guest Feedback System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --ink:#1c1a17;--ink-soft:#5a544c;--paper:#fbfaf7;--card:#ffffff;--line:#e6e1d8;
+  --gold:#a9852f;--gold-dark:#8a6c24;--gold-tint:#f6efdd;
+  --green:#2f6d4f;--green-tint:#e9f3ee;--red:#a4372c;--red-tint:#fbeae8;
+  --amber:#a8760f;--amber-tint:#faf1de;--radius:14px;
+  --shadow:0 4px 18px rgba(28,26,23,.06);--shadow-lg:0 12px 40px rgba(28,26,23,.14);
+  --font:"Georgia","Iowan Old Style",serif;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:var(--font-ui);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,.serif{font-family:var(--font)}
+a{color:var(--gold-dark)}
+button{font-family:inherit}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s ease;background:var(--ink);color:#fff}
+.btn:hover{opacity:.92}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.btn-gold{background:var(--gold);color:#fff}
+.btn.btn-outline{background:transparent;border-color:var(--line);color:var(--ink)}
+.btn.btn-danger{background:var(--red);color:#fff}
+.btn.btn-sm{padding:8px 14px;font-size:13px;border-radius:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.badge.green{background:var(--green-tint);color:var(--green)}
+.badge.red{background:var(--red-tint);color:var(--red)}
+.badge.amber{background:var(--amber-tint);color:var(--amber)}
+.badge.gray{background:#f0efec;color:var(--ink-soft)}
+input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-family:var(--font-ui);background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+label{font-size:13px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:6px}
+.toast-wrap{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:10px}
+.toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:10px;box-shadow:var(--shadow-lg);font-size:14px;max-width:320px}
+.toast.error{background:var(--red)}
+.toast.success{background:var(--green)}
+.spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skeleton{background:linear-gradient(90deg,#f0efec 25%,#e6e1d8 37%,#f0efec 63%);background-size:400% 100%;animation:sk 1.4s ease infinite;border-radius:8px}
+@keyframes sk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.field{margin-bottom:18px}
+.rating-chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600}
+.rating-chip.Poor{background:var(--red-tint);color:var(--red)}
+.rating-chip.Average{background:var(--amber-tint);color:var(--amber)}
+.rating-chip.Excellent{background:var(--green-tint);color:var(--green)}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
+.login-card{background:#fff;border-radius:16px;padding:36px 30px;max-width:380px;width:100%}
+#app{display:flex;min-height:100vh}
+.sidebar{width:230px;background:var(--ink);color:#eee;flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;transition:transform .2s;z-index:60}
+.sidebar .brand{padding:22px 20px;font-family:var(--font);font-size:18px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar nav{flex:1;overflow-y:auto;padding:12px 0}
+.sidebar a{display:flex;align-items:center;gap:10px;padding:11px 20px;color:#cfc9be;text-decoration:none;font-size:14px;font-weight:500;border-left:3px solid transparent}
+.sidebar a:hover{background:rgba(255,255,255,.06);color:#fff}
+.sidebar a.active{background:rgba(169,133,47,.16);color:#fff;border-left-color:var(--gold)}
+.sidebar .foot{padding:14px 20px;border-top:1px solid rgba(255,255,255,.1);font-size:12.5px;color:#a9a297}
+.main{margin-left:230px;flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:40}
+.topbar h2{margin:0;font-size:19px}
+.hamburger{display:none;background:none;border:none;font-size:22px;cursor:pointer}
+.content{padding:22px 24px;max-width:1280px;width:100%;margin:0 auto}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+.stat-card{padding:18px}
+.stat-card .num{font-size:26px;font-weight:700;font-family:var(--font)}
+.stat-card .lbl{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
+.panel{padding:20px;margin-bottom:18px}
+.panel h3{margin:0 0 14px;font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--ink-soft);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+tr:hover td{background:#faf9f6}
+.table-scroll{overflow-x:auto}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:16px}
+.toolbar .f{min-width:150px}
+.toolbar label{margin-bottom:4px}
+.modal-bg{position:fixed;inset:0;background:rgba(20,18,15,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal{background:#fff;border-radius:14px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:24px}
+.modal h3{margin-top:0}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.qr-tile{padding:16px;text-align:center}
+.empty-state{text-align:center;padding:50px 20px;color:var(--ink-soft)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px}
+.checkbox-list{max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px}
+.checkbox-list label{display:flex;align-items:center;gap:8px;font-weight:500;color:var(--ink);padding:4px 0}
+.checkbox-list input{width:auto}
+@media (max-width:900px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.hamburger{display:block}}
+@media print{.sidebar,.topbar,.no-print{display:none !important}.main{margin-left:0}body{background:#fff}}
+</style>
+</head>
+<body>
+
+<!--
+============================================================================
+ SETUP (once): this page needs a Firebase project with Authentication
+ (Email/Password) and Firestore Database enabled — no Cloud Functions, no
+ Storage, no billing plan, no CLI.
+
+ 1. Fill in FIREBASE CONFIG below (Firebase Console → Project Settings →
+    Your apps → Web app). Use the SAME config in your feedback.html file.
+ 2. Paste the rules block below into Firebase Console → Firestore
+    Database → Rules → Publish. This is the real security layer.
+ 3. Host this file anywhere (Firebase Hosting, Netlify, your own server,
+    or even just open it locally) — e.g. yoursite.com/admin.html
+ 4. Open it, click "First-time setup?" and create your Admin account.
+
+⇩⇩⇩ PASTE INTO FIRESTORE RULES ⇩⇩⇩
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function myData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() { return signedIn() && myData().active == true && myData().role == 'admin'; }
+    function isUser() { return signedIn() && myData().active == true && myData().role == 'user'; }
+    function myLocations() { return myData().assignedLocationIds; }
+
+    match /feedback/{id} {
+      allow create: if request.resource.data.status == 'new'
+        && request.resource.data.locationId is string
+        && request.resource.data.keys().hasAll(['feedbackId','locationId','locationName','dateOfVisit','ratings','submittedAt'])
+        && request.resource.data.keys().size() <= 80
+        && request.resource.data.get('likedBest', '').size() <= 4000
+        && request.resource.data.get('improvementSuggestion', '').size() <= 4000;
+      allow read: if isAdmin() || (isUser() && resource.data.locationId in myLocations());
+      allow update, delete: if isAdmin();
+    }
+    match /locations/{id} {
+      allow read: if resource.data.active == true || isAdmin() || isUser();
+      allow write: if isAdmin();
+    }
+    match /users/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create: if isAdmin()
+        || (signedIn() && request.auth.uid == uid && request.resource.data.role == 'admin'
+            && !exists(/databases/$(database)/documents/settings/bootstrap));
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /emailRecipients/{id} { allow read, write: if isAdmin(); }
+    match /settings/bootstrap {
+      allow read: if true;
+      allow create: if signedIn() && !exists(/databases/$(database)/documents/settings/bootstrap);
+      allow update, delete: if isAdmin();
+    }
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /auditLogs/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+    match /counters/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.value == 1;
+      allow update: if request.resource.data.value == resource.data.value + 1;
+      allow delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
+
+⇧⇧⇧ END OF FIRESTORE RULES ⇧⇧⇧
+
+ Note: this admin page does not send automatic email notifications when
+ feedback comes in (that needs a small server-side piece, since it must
+ keep an SMTP password secret). The Email Destinations page still lets you
+ record who should be notified for each location — check the Dashboard
+ regularly, or ask for the Cloud Functions edition if you want automatic
+ email alerts.
+============================================================================
+-->
+
+<div id="toastWrap" class="toast-wrap"></div>
+<div id="modalRoot"></div>
+
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <h2 class="serif" style="margin-top:0" id="orgNameLogin">Admin Sign In</h2>
+    <div id="loginForm">
+      <div class="field" style="margin-bottom:14px"><label>Email</label><input type="email" id="loginEmail"></div>
+      <div class="field" style="margin-bottom:16px"><label>Password</label><input type="password" id="loginPassword"></div>
+      <button class="btn btn-gold" id="loginBtn" style="width:100%">Sign In</button>
+      <p style="text-align:center;margin-top:14px;font-size:13px"><a href="#" id="showSetup">First-time setup?</a></p>
+    </div>
+    <div id="setupForm" style="display:none">
+      <p style="font-size:13.5px;color:var(--ink-soft)">Create the first Administrator account. This only works once.</p>
+      <div class="field" style="margin-bottom:12px"><label>Full Name</label><input type="text" id="setupName"></div>
+      <div class="field" style="margin-bottom:12px"><label>Admin Email</label><input type="email" id="setupEmail"></div>
+      <div class="field" style="margin-bottom:16px"><label>Password (min 8 characters)</label><input type="password" id="setupPassword"></div>
+      <button class="btn btn-gold" id="setupBtn" style="width:100%">Create Admin Account</button>
+      <p style="text-align:center;margin-top:14px;font-size:13px"><a href="#" id="showLogin">Back to sign in</a></p>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand serif" id="orgNameSidebar">Guest Feedback</div>
+    <nav id="navLinks"></nav>
+    <div class="foot" id="userFoot"></div>
+  </aside>
+  <div class="main">
+    <div class="topbar no-print">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="hamburger" id="hamburgerBtn">☰</button>
+        <h2 id="pageTitle">Dashboard</h2>
+      </div>
+      <button class="btn btn-outline btn-sm" id="logoutBtn">Log Out</button>
+    </div>
+    <div class="content" id="mainContent"></div>
+  </div>
+</div>
+
+<script type="module">
+// ============================================================================
+// FIREBASE CONFIG — same project/config as your feedback.html file.
+// ============================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+  authDomain: "guest-feedback-f27fb.firebaseapp.com",
+  projectId: "guest-feedback-f27fb",
+  storageBucket: "guest-feedback-f27fb.firebasestorage.app",
+  messagingSenderId: "640014161549",
+  appId: "1:640014161549:web:1845a04aa2e8350692b4c4"
+};
+
+
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import * as Auth from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import * as Fs from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = Auth.getAuth(app);
+const db = Fs.getFirestore(app);
+
+// A second, independent Firebase app instance — used ONLY so an Admin can
+// create a new staff login without being signed out of their own session.
+const secondaryApp = initializeApp(firebaseConfig, "secondary");
+const secondaryAuth = Auth.getAuth(secondaryApp);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function toast(msg, type = "") {
+  const wrap = document.getElementById("toastWrap");
+  const t = document.createElement("div");
+  t.className = "toast " + type; t.textContent = msg;
+  wrap.appendChild(t); setTimeout(() => t.remove(), 4500);
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function fmtDate(d) {
+  if (!d) return "-";
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) { const [y,m,da]=d.split("-"); return `${da}/${m}/${y}`; }
+  const dt = d.toDate ? d.toDate() : new Date(d);
+  if (isNaN(dt)) return String(d);
+  return dt.toLocaleDateString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric", timeZone:"Asia/Qatar" });
+}
+function fmtDateTime(d) {
+  if (!d) return "-";
+  const dt = d.toDate ? d.toDate() : new Date(d);
+  if (isNaN(dt)) return "-";
+  return dt.toLocaleString("en-GB", { timeZone:"Asia/Qatar", day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+function openModal(html) {
+  document.getElementById("modalRoot").innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal">${html}</div></div>`;
+  document.getElementById("modalBg").addEventListener("click", (e) => { if (e.target.id === "modalBg") closeModal(); });
+}
+function closeModal() { document.getElementById("modalRoot").innerHTML = ""; }
+function csvEscape(v) { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
+function downloadFile(filename, content, mime = "application/octet-stream") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+// ---------------------------------------------------------------------------
+// The guest questionnaire is fully admin-configurable (Settings → Questionnaire
+// Builder): header text, every question, and the thank-you message. This is
+// the built-in starting point used until an admin saves their own version to
+// settings/questionnaire. Location and Date of Visit are intentionally NOT
+// part of this list — they are fixed at the top of the guest form because QR
+// routing, per-location reports and date filters depend on them.
+// ---------------------------------------------------------------------------
+const DEFAULT_QUESTIONNAIRE = {
+  headerTitle: "We appreciate your feedback",
+  headerMessage: "Please take a moment to share your comments by completing this short form.",
+  footerTitle: "Thank you for your constructive feedback!",
+  footerMessage: "It genuinely helps us improve our service for you and every guest after you.",
+  fields: [
+    { id: "serverName", type: "text", label: "Server's Name", required: false, placeholder: "If you remember it — totally optional", inputType: "text" },
+    { id: "recommendation", type: "choice", label: "Would you recommend us to your friends and family?", required: true, options: ["Yes", "No"] },
+    { id: "heardAboutUs", type: "choice", label: "How did you hear about us?", required: true, options: ["Friends", "Newspaper & Magazines", "Social Media", "Others"] },
+    { id: "menuSelection", type: "rating", label: "Menu Selection", required: true },
+    { id: "foodQuality", type: "rating", label: "Food Quality", required: true },
+    { id: "service", type: "rating", label: "Service", required: true },
+    { id: "atmosphere", type: "rating", label: "Atmosphere / Ambiance", required: true },
+    { id: "valueForMoney", type: "rating", label: "Value for Money", required: true },
+    { id: "overallExperience", type: "rating", label: "Overall Experience", required: true },
+    { id: "likedBest", type: "textarea", label: "What did you like best about {location}?", required: false, placeholder: "Tell us what stood out…" },
+    { id: "improvementSuggestion", type: "textarea", label: "What could we do to make your experience even better?", required: false, placeholder: "We'd love to hear your suggestions…" },
+    { id: "guestName", type: "text", label: "Name", required: false, placeholder: "Your name", inputType: "text" },
+    { id: "contactNumber", type: "text", label: "Contact No.", required: false, placeholder: "Phone number", inputType: "tel" },
+    { id: "guestEmail", type: "text", label: "Email", required: false, placeholder: "you@example.com", inputType: "email" },
+  ],
+};
+const cloneQ = (q) => JSON.parse(JSON.stringify(q));
+
+function catLabel(k) {
+  const found = ((state.questionnaire || DEFAULT_QUESTIONNAIRE).fields).find((f) => f.id === k);
+  if (found) return found.label;
+  return String(k).replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+}
+function toCamelId(label, existingIds) {
+  let base = label.trim().replace(/[^a-zA-Z0-9 ]/g, "").split(/\s+/).filter(Boolean)
+    .map((w, i) => i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+  if (!base) base = "question";
+  let id = base, n = 2;
+  while (existingIds.includes(id)) { id = base + n; n++; }
+  return id;
+}
+async function loadQuestionnaire() {
+  try {
+    const snap = await Fs.getDoc(Fs.doc(db, "settings", "questionnaire"));
+    if (snap.exists()) {
+      const d = snap.data();
+      if (Array.isArray(d.fields) && d.fields.length) {
+        state.questionnaire = {
+          headerTitle: d.headerTitle || DEFAULT_QUESTIONNAIRE.headerTitle,
+          headerMessage: d.headerMessage || DEFAULT_QUESTIONNAIRE.headerMessage,
+          footerTitle: d.footerTitle || DEFAULT_QUESTIONNAIRE.footerTitle,
+          footerMessage: d.footerMessage || DEFAULT_QUESTIONNAIRE.footerMessage,
+          fields: d.fields,
+        };
+        return;
+      }
+      // Migrate from the earlier "rating categories only" version, if that's what was saved.
+      if (Array.isArray(d.ratingCategories) && d.ratingCategories.length) {
+        const q = cloneQ(DEFAULT_QUESTIONNAIRE);
+        const ratings = d.ratingCategories.map((c) => ({ id: c.id, type: "rating", label: c.label, required: true }));
+        const nonRatings = q.fields.filter((f) => f.type !== "rating");
+        const at = nonRatings.findIndex((f) => f.id === "likedBest");
+        q.fields = [...nonRatings.slice(0, at), ...ratings, ...nonRatings.slice(at)];
+        state.questionnaire = q;
+        return;
+      }
+    }
+  } catch (e) {}
+  state.questionnaire = cloneQ(DEFAULT_QUESTIONNAIRE);
+}
+
+const state = { user: null, role: null, active: true, assignedLocationIds: [], profile: null, locations: [], questionnaire: cloneQ(DEFAULT_QUESTIONNAIRE), orgName: "Guest Feedback System" };
+
+document.getElementById("showSetup").addEventListener("click", (e) => { e.preventDefault(); document.getElementById("loginForm").style.display = "none"; document.getElementById("setupForm").style.display = "block"; });
+document.getElementById("showLogin").addEventListener("click", (e) => { e.preventDefault(); document.getElementById("setupForm").style.display = "none"; document.getElementById("loginForm").style.display = "block"; });
+
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  if (!email || !password) return toast("Enter your email and password.", "error");
+  try { await Auth.signInWithEmailAndPassword(auth, email, password); }
+  catch (err) { toast("Sign in failed. Please check your email and password.", "error"); }
+});
+
+document.getElementById("setupBtn").addEventListener("click", async () => {
+  const fullName = document.getElementById("setupName").value.trim();
+  const email = document.getElementById("setupEmail").value.trim();
+  const password = document.getElementById("setupPassword").value;
+  if (!email || password.length < 8) return toast("Enter a valid email and an 8+ character password.", "error");
+  try {
+    const cred = await Auth.createUserWithEmailAndPassword(auth, email, password);
+    await Fs.setDoc(Fs.doc(db, "users", cred.user.uid), {
+      fullName: fullName || email, email, role: "admin", assignedLocationIds: [], active: true,
+      createdAt: Fs.serverTimestamp(), updatedAt: Fs.serverTimestamp(), lastLoginAt: Fs.serverTimestamp(),
+    });
+    await Fs.setDoc(Fs.doc(db, "settings", "bootstrap"), { completed: true, at: Fs.serverTimestamp() });
+    toast("Admin account created.", "success");
+  } catch (err) {
+    console.error(err);
+    if (err.code === "auth/email-already-in-use") toast("That email is already in use.", "error");
+    else toast("Setup has already been completed, or could not create the account. Please sign in instead.", "error");
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => Auth.signOut(auth));
+document.getElementById("hamburgerBtn").addEventListener("click", () => document.getElementById("sidebar").classList.toggle("open"));
+
+Auth.onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    state.user = null;
+    document.getElementById("app").style.display = "none";
+    document.getElementById("loginView").style.display = "flex";
+    return;
+  }
+  const profSnap = await Fs.getDoc(Fs.doc(db, "users", user.uid));
+  if (!profSnap.exists() || profSnap.data().active === false) {
+    toast(!profSnap.exists() ? "Your account is not set up in this system. Contact an administrator." : "Your account has been disabled. Contact an administrator.", "error");
+    await Auth.signOut(auth);
+    return;
+  }
+  const p = profSnap.data();
+  state.user = user; state.role = p.role; state.active = p.active; state.assignedLocationIds = p.assignedLocationIds || []; state.profile = p;
+  Fs.updateDoc(Fs.doc(db, "users", user.uid), { lastLoginAt: Fs.serverTimestamp() }).catch(() => {});
+
+  try {
+    const s = await Fs.getDoc(Fs.doc(db, "settings", "general"));
+    if (s.exists() && s.data().organizationName) {
+      state.orgName = s.data().organizationName;
+      document.getElementById("orgNameSidebar").textContent = state.orgName;
+      document.getElementById("orgNameLogin").textContent = state.orgName;
+    }
+  } catch (e) {}
+
+  await loadLocations();
+  await loadQuestionnaire();
+  document.getElementById("loginView").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  renderNav();
+  router();
+});
+
+async function loadLocations() {
+  const snap = await Fs.getDocs(Fs.collection(db, "locations"));
+  state.locations = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.displayOrder??0)-(b.displayOrder??0));
+  return state.locations;
+}
+function visibleLocations() { return state.role === "admin" ? state.locations : state.locations.filter((l) => state.assignedLocationIds.includes(l.id)); }
+function locName(id) { const l = state.locations.find((x) => x.id === id); return l ? l.name : id; }
+async function writeAudit(action, detail) {
+  try { await Fs.addDoc(Fs.collection(db, "auditLogs"), { userId: state.user.uid, userEmail: state.user.email, action, detail: String(detail || ""), at: Fs.serverTimestamp() }); }
+  catch (e) { console.error("audit log failed", e); }
+}
+
+const NAV = [
+  { hash: "#/dashboard", label: "Dashboard", icon: "▤", roles: ["admin","user"] },
+  { hash: "#/feedback", label: "Feedback", icon: "✉", roles: ["admin","user"] },
+  { hash: "#/locations", label: "Locations", icon: "📍", roles: ["admin"] },
+  { hash: "#/users", label: "Users", icon: "👤", roles: ["admin"] },
+  { hash: "#/emails", label: "Email Destinations", icon: "✉︎", roles: ["admin"] },
+  { hash: "#/qrcodes", label: "QR Codes", icon: "▦", roles: ["admin"] },
+  { hash: "#/backup", label: "Backup & Restore", icon: "⭯", roles: ["admin"] },
+  { hash: "#/settings", label: "Settings", icon: "⚙", roles: ["admin"] },
+  { hash: "#/audit", label: "Audit Log", icon: "≣", roles: ["admin"] },
+];
+function renderNav() {
+  const nav = document.getElementById("navLinks");
+  nav.innerHTML = NAV.filter((n) => n.roles.includes(state.role)).map((n) => `<a href="${n.hash}" data-hash="${n.hash}"><span>${n.icon}</span><span>${n.label}</span></a>`).join("");
+  document.getElementById("userFoot").innerHTML = `${esc(state.profile?.fullName || state.user.email)}<br><span style="opacity:.7">${state.role === "admin" ? "Administrator" : "User"}</span>`;
+}
+function highlightNav() {
+  const h = location.hash.split("/").slice(0,2).join("/") || "#/dashboard";
+  document.querySelectorAll("#navLinks a").forEach((a) => a.classList.toggle("active", a.dataset.hash === h));
+}
+window.addEventListener("hashchange", router);
+
+async function router() {
+  if (!state.user) return;
+  const parts = (location.hash || "#/dashboard").replace("#/", "").split("/").filter(Boolean);
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="skeleton" style="height:200px"></div>`;
+  highlightNav();
+  document.getElementById("sidebar").classList.remove("open");
+  try {
+    if (parts[0] === "feedback" && parts[1]) { document.getElementById("pageTitle").textContent = "Feedback Detail"; await viewFeedbackDetail(main, parts[1]); }
+    else if (parts[0] === "feedback") { document.getElementById("pageTitle").textContent = "Feedback"; await viewFeedbackList(main); }
+    else if (parts[0] === "locations" && state.role === "admin") { document.getElementById("pageTitle").textContent = "Locations"; await viewLocations(main); }
+    else if (parts[0] === "users" && state.role === "admin") { document.getElementById("pageTitle").textContent = "Users"; await viewUsers(main); }
+    else if (parts[0] === "emails" && state.role === "admin") { document.getElementById("pageTitle").textContent = "Email Destinations"; await viewEmails(main); }
+    else if (parts[0] === "qrcodes" && state.role === "admin") { document.getElementById("pageTitle").textContent = "QR Codes"; await viewQrCodes(main); }
+    else if (parts[0] === "backup" && state.role === "admin") { document.getElementById("pageTitle").textContent = "Backup & Restore"; await viewBackup(main); }
+    else if (parts[0] === "settings" && state.role === "admin") { document.getElementById("pageTitle").textContent = "Settings"; await viewSettings(main); }
+    else if (parts[0] === "audit" && state.role === "admin") { document.getElementById("pageTitle").textContent = "Audit Log"; await viewAudit(main); }
+    else { document.getElementById("pageTitle").textContent = "Dashboard"; await viewDashboard(main); }
+  } catch (err) {
+    console.error(err);
+    main.innerHTML = `<div class="panel card"><p>Something went wrong loading this page.</p><p style="color:var(--ink-soft);font-size:13px">${esc(err.message)}</p></div>`;
+  }
+}
+
+// ---- Dashboard --------------------------------------------------------
+function statCard(num, lbl) { return `<div class="card stat-card"><div class="num">${num}</div><div class="lbl">${lbl}</div></div>`; }
+async function viewDashboard(main) {
+  const isAdmin = state.role === "admin";
+  let q = Fs.query(Fs.collection(db, "feedback"), Fs.orderBy("submittedAt", "desc"), Fs.limit(500));
+  if (!isAdmin) {
+    if (state.assignedLocationIds.length === 0) { main.innerHTML = `<div class="empty-state">No locations have been assigned to your account. Please contact an administrator.</div>`; return; }
+    q = Fs.query(Fs.collection(db, "feedback"), Fs.where("locationId", "in", state.assignedLocationIds.slice(0,30)), Fs.orderBy("submittedAt","desc"), Fs.limit(500));
+  }
+  const snap = await Fs.getDocs(q);
+  const rows = snap.docs.map((d) => d.data());
+  const todayStr = new Date().toISOString().slice(0,10); const monthPrefix = todayStr.slice(0,7);
+  const total = rows.length, today = rows.filter((r)=>r.dateOfVisit===todayStr).length, thisMonth = rows.filter((r)=>(r.dateOfVisit||"").startsWith(monthPrefix)).length;
+  const recYes = rows.filter((r)=>r.recommendation==="Yes").length, recNo = rows.filter((r)=>r.recommendation==="No").length;
+  let excellent=0, average=0, poor=0, overallSum=0, overallCount=0; const catCounts = {};
+  rows.forEach((r) => {
+    Object.entries(r.ratings||{}).forEach(([k,v]) => {
+      catCounts[k] = catCounts[k] || {Poor:0,Average:0,Excellent:0};
+      if (catCounts[k][v]!==undefined) catCounts[k][v]++;
+      if (v==="Excellent") excellent++; else if (v==="Average") average++; else if (v==="Poor") poor++;
+    });
+    if (r.ratings?.overallExperience) { overallCount++; overallSum += r.ratings.overallExperience==="Excellent"?3:r.ratings.overallExperience==="Average"?2:1; }
+  });
+  const avgOverall = overallCount ? (overallSum/overallCount).toFixed(2) : "-";
+  const byLoc = {}; rows.forEach((r)=>{byLoc[r.locationName]=(byLoc[r.locationName]||0)+1;});
+  const maxLoc = Math.max(1, ...Object.values(byLoc));
+
+  main.innerHTML = `
+    <div class="grid-cards">
+      ${statCard(total,"Total Feedback (last 500)")}${statCard(today,"Feedback Today")}${statCard(thisMonth,"Feedback This Month")}
+      ${statCard(avgOverall+" / 3","Avg. Overall Experience")}${statCard(excellent,"Excellent Ratings")}${statCard(average,"Average Ratings")}
+      ${statCard(poor,"Poor Ratings")}${statCard(recYes,"Would Recommend — Yes")}${statCard(recNo,"Would Recommend — No")}
+    </div>
+    <div class="panel card"><h3>Feedback by Location</h3>
+      ${Object.keys(byLoc).length===0 ? `<div class="empty-state">No feedback records found.</div>` :
+        Object.entries(byLoc).sort((a,b)=>b[1]-a[1]).map(([name,count])=>`
+          <div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${esc(name)}</span><span>${count}</span></div>
+          <div style="background:#f0efec;border-radius:6px;height:10px"><div style="background:var(--gold);width:${(count/maxLoc*100).toFixed(0)}%;height:10px;border-radius:6px"></div></div></div>`).join("")}
+    </div>
+    <div class="panel card"><h3>Rating Summary</h3><div class="table-scroll"><table>
+      <thead><tr><th>Category</th><th>Poor</th><th>Average</th><th>Excellent</th></tr></thead>
+      <tbody>${Object.entries(catCounts).map(([k,v])=>`<tr><td>${catLabel(k)}</td><td>${v.Poor}</td><td>${v.Average}</td><td>${v.Excellent}</td></tr>`).join("")||`<tr><td colspan="4">No data yet.</td></tr>`}</tbody>
+    </table></div></div>
+    <div class="panel card"><h3>Recent Feedback</h3><div class="table-scroll"><table>
+      <thead><tr><th>ID</th><th>Location</th><th>Date</th><th>Overall</th><th>Recommend</th></tr></thead>
+      <tbody>${rows.slice(0,10).map((r)=>`<tr style="cursor:pointer" data-open="${r.feedbackId}"><td>${r.feedbackId}</td><td>${esc(r.locationName)}</td><td>${fmtDate(r.dateOfVisit)}</td>
+      <td><span class="rating-chip ${r.ratings?.overallExperience}">${r.ratings?.overallExperience||"-"}</span></td><td>${r.recommendation}</td></tr>`).join("")||`<tr><td colspan="5">No feedback records found.</td></tr>`}</tbody>
+    </table></div></div>`;
+  main.querySelectorAll("[data-open]").forEach((tr) => tr.addEventListener("click", () => location.hash = `#/feedback/${tr.dataset.open}`));
+}
+
+// ---- Feedback list ------------------------------------------------------
+let fbCache = [], fbPage = 1, fbPageSize = 25;
+async function viewFeedbackList(main) {
+  const locs = visibleLocations();
+  main.innerHTML = `
+    <div class="panel card">
+      <div class="toolbar">
+        <div class="f" style="min-width:220px"><label>Search</label><input id="fSearch" placeholder="ID, name, phone, email, comments…"></div>
+        <div class="f"><label>Location</label><select id="fLocation"><option value="">All</option>${locs.map((l)=>`<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></div>
+        <div class="f"><label>Date From</label><input type="date" id="fFrom"></div>
+        <div class="f"><label>Date To</label><input type="date" id="fTo"></div>
+        <div class="f"><label>Recommendation</label><select id="fRec"><option value="">Any</option><option>Yes</option><option>No</option></select></div>
+        <div class="f"><label>Server Name</label><input id="fServer" placeholder="e.g. John"></div>
+        <div class="f"><label>Per page</label><select id="fPageSize"><option>25</option><option>50</option><option>100</option></select></div>
+        <button class="btn btn-outline btn-sm" id="fClear">Clear Filters</button>
+        <button class="btn btn-gold btn-sm" id="fApply">Apply</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button class="btn btn-outline btn-sm" id="fPrint">Print List</button>
+        <button class="btn btn-outline btn-sm" id="fCsv">Export CSV</button>
+      </div>
+      <div class="table-scroll"><table>
+        <thead><tr><th>ID</th><th>Visit Date</th><th>Location</th><th>Server</th><th>Recommend</th><th>Overall</th><th>Guest</th><th>Submitted</th><th></th></tr></thead>
+        <tbody id="fbTbody"><tr><td colspan="9">Loading…</td></tr></tbody>
+      </table></div>
+      <div class="pager"><button class="btn btn-outline btn-sm" id="fPrev">Prev</button><span id="fPageLbl" style="font-size:13px;color:var(--ink-soft)"></span><button class="btn btn-outline btn-sm" id="fNext">Next</button></div>
+    </div>`;
+  document.getElementById("fPageSize").value = String(fbPageSize);
+
+  async function runQuery() {
+    const locId = document.getElementById("fLocation").value;
+    const from = document.getElementById("fFrom").value, to = document.getElementById("fTo").value;
+    const clauses = [];
+    if (state.role !== "admin") {
+      if (state.assignedLocationIds.length === 0) { fbCache = []; renderRows(); return; }
+      clauses.push(Fs.where("locationId", "in", locId ? [locId].filter((x)=>state.assignedLocationIds.includes(x)) : state.assignedLocationIds.slice(0,30)));
+    } else if (locId) clauses.push(Fs.where("locationId", "==", locId));
+    const q = Fs.query(Fs.collection(db, "feedback"), ...clauses, Fs.orderBy("submittedAt","desc"), Fs.limit(1000));
+    const snap = await Fs.getDocs(q);
+    let rows = snap.docs.map((d) => d.data());
+    if (from) rows = rows.filter((r) => r.dateOfVisit >= from);
+    if (to) rows = rows.filter((r) => r.dateOfVisit <= to);
+    fbCache = rows; fbPage = 1; renderRows();
+  }
+  function applyClientFilters(rows) {
+    const search = document.getElementById("fSearch").value.trim().toLowerCase();
+    const rec = document.getElementById("fRec").value, server = document.getElementById("fServer").value.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (rec && r.recommendation !== rec) return false;
+      if (server && !(r.serverName||"").toLowerCase().includes(server)) return false;
+      if (search) { const hay=[r.feedbackId,r.locationName,r.serverName,r.guestName,r.contactNumber,r.guestEmail,r.likedBest,r.improvementSuggestion].join(" ").toLowerCase(); if (!hay.includes(search)) return false; }
+      return true;
+    });
+  }
+  function renderRows() {
+    fbPageSize = Number(document.getElementById("fPageSize").value);
+    const filtered = applyClientFilters(fbCache);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / fbPageSize));
+    fbPage = Math.min(fbPage, totalPages);
+    const startIdx = (fbPage-1)*fbPageSize;
+    const pageRows = filtered.slice(startIdx, startIdx+fbPageSize);
+    document.getElementById("fbTbody").innerHTML = pageRows.length ? pageRows.map((r)=>`
+      <tr><td>${r.feedbackId}</td><td>${fmtDate(r.dateOfVisit)}</td><td>${esc(r.locationName)}</td><td>${esc(r.serverName||"-")}</td>
+      <td>${r.recommendation}</td><td><span class="rating-chip ${r.ratings?.overallExperience}">${r.ratings?.overallExperience||"-"}</span></td>
+      <td>${esc(r.guestName||"-")}</td><td>${fmtDateTime(r.submittedAt)}</td><td><a href="#/feedback/${r.feedbackId}">View</a></td></tr>`).join("")
+      : `<tr><td colspan="9">No feedback matches your search criteria.</td></tr>`;
+    document.getElementById("fPageLbl").textContent = `Page ${fbPage} of ${totalPages} (${filtered.length} records)`;
+  }
+  document.getElementById("fApply").addEventListener("click", runQuery);
+  document.getElementById("fSearch").addEventListener("input", renderRows);
+  document.getElementById("fRec").addEventListener("change", renderRows);
+  document.getElementById("fServer").addEventListener("input", renderRows);
+  document.getElementById("fPageSize").addEventListener("change", ()=>{fbPage=1;renderRows();});
+  document.getElementById("fPrev").addEventListener("click", ()=>{if(fbPage>1){fbPage--;renderRows();}});
+  document.getElementById("fNext").addEventListener("click", ()=>{fbPage++;renderRows();});
+  document.getElementById("fClear").addEventListener("click", ()=>{["fSearch","fLocation","fFrom","fTo","fRec","fServer"].forEach((id)=>document.getElementById(id).value="");runQuery();});
+  document.getElementById("fPrint").addEventListener("click", ()=>window.print());
+  document.getElementById("fCsv").addEventListener("click", () => {
+    const rows = applyClientFilters(fbCache);
+    const qFields = state.questionnaire.fields;
+    const header = ["Feedback ID","Date of Visit","Location", ...qFields.map((f)=>f.label.replace(/\{location\}/g,"[location]")), "Submitted At"];
+    const cell = (r, f) => {
+      if (f.type === "rating") return r.ratings?.[f.id] ?? "";
+      let v = r[f.id] ?? "";
+      if (f.type === "choice" && r[f.id + "Other"]) v += " — " + r[f.id + "Other"];
+      return v;
+    };
+    const lines = [header.map(csvEscape).join(",")].concat(rows.map((r)=>[r.feedbackId,r.dateOfVisit,r.locationName, ...qFields.map((f)=>cell(r,f)), fmtDateTime(r.submittedAt)].map(csvEscape).join(",")));
+    downloadFile(`feedback-export-${Date.now()}.csv`, "\uFEFF"+lines.join("\n"), "text/csv;charset=utf-8");
+  });
+  await runQuery();
+}
+
+// ---- Feedback detail ------------------------------------------------------
+async function viewFeedbackDetail(main, id) {
+  const snap = await Fs.getDoc(Fs.doc(db, "feedback", id));
+  if (!snap.exists()) { main.innerHTML = `<div class="empty-state">Feedback record not found.</div>`; return; }
+  const r = snap.data();
+  if (state.role !== "admin" && !state.assignedLocationIds.includes(r.locationId)) { main.innerHTML = `<div class="empty-state">You do not have access to this feedback record.</div>`; return; }
+  // Render every question currently configured (in the admin's chosen order),
+  // then any answers this record holds for questions that have since been
+  // removed/renamed — so historical feedback never silently loses data.
+  const qFields = state.questionnaire.fields;
+  const knownIds = new Set(qFields.map((f) => f.id));
+  const SYSTEM_KEYS = new Set(["feedbackId","locationId","locationName","dateOfVisit","ratings","submittedAt","updatedAt","status","createdBy","deleted","deletedAt","deletedBy","editedBy","editHistory"]);
+  const orphanKeys = Object.keys(r).filter((k) => !SYSTEM_KEYS.has(k) && !knownIds.has(k) && !(k.endsWith("Other") && knownIds.has(k.slice(0, -5))));
+  const orphanRatingKeys = Object.keys(r.ratings || {}).filter((k) => !knownIds.has(k));
+  const label = (f) => esc(f.label.replace(/\{location\}/g, r.locationName || "this location"));
+  const rowFor = (f) => {
+    if (f.type === "rating") return `<tr><th style="width:40%">${label(f)}</th><td><span class="rating-chip ${r.ratings?.[f.id]}">${r.ratings?.[f.id] || "-"}</span></td></tr>`;
+    if (f.type === "choice") { let v = r[f.id] || "-"; if (r[f.id + "Other"]) v += " — " + r[f.id + "Other"]; return `<tr><th style="width:40%">${label(f)}</th><td>${esc(v)}</td></tr>`; }
+    return `<tr><th style="width:40%">${label(f)}</th><td>${esc(r[f.id] || "-")}</td></tr>`;
+  };
+  const tableFields = qFields.filter((f) => f.type !== "textarea");
+  const longFields = qFields.filter((f) => f.type === "textarea");
+  const removedBadge = ` <span class="badge gray" style="margin-left:4px">removed question</span>`;
+  main.innerHTML = `
+    <div class="no-print" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" id="backBtn">← Back to list</button>
+      <button class="btn btn-outline btn-sm" id="printBtn">Print / Save as PDF</button>
+      ${state.role==="admin" ? `<button class="btn btn-outline btn-sm" id="editBtn">Edit</button><button class="btn btn-danger btn-sm" id="delBtn">Delete</button>` : ""}
+    </div>
+    <div class="panel card" style="max-width:720px;margin:0 auto">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)">${esc(state.orgName)}</div>
+        <h2 style="margin:6px 0 0" class="serif">Guest Feedback Report</h2>
+        <div style="color:var(--ink-soft);font-size:13px">Feedback ID: ${r.feedbackId}</div>
+      </div>
+      <table style="margin-bottom:16px">
+        <tr><th style="width:40%">Location</th><td>${esc(r.locationName)}</td></tr>
+        <tr><th>Date of Visit</th><td>${fmtDate(r.dateOfVisit)}</td></tr>
+        ${tableFields.map(rowFor).join("")}
+        ${orphanRatingKeys.map((k) => `<tr><th style="width:40%">${esc(catLabel(k))}${removedBadge}</th><td><span class="rating-chip ${r.ratings[k]}">${r.ratings[k] || "-"}</span></td></tr>`).join("")}
+        ${orphanKeys.map((k) => `<tr><th style="width:40%">${esc(catLabel(k))}${removedBadge}</th><td>${esc(typeof r[k] === "object" ? JSON.stringify(r[k]) : r[k])}</td></tr>`).join("")}
+        <tr><th>Submitted</th><td>${fmtDateTime(r.submittedAt)}</td></tr>
+      </table>
+      ${longFields.map((f) => `<h3>${label(f)}</h3><p style="white-space:pre-wrap">${esc(r[f.id] || "—")}</p>`).join("")}
+      ${r.editedBy ? `<p style="font-size:12px;color:var(--ink-soft);margin-top:14px">Last edited ${fmtDateTime(r.updatedAt)}. Edits are recorded in the Audit Log.</p>` : ""}
+    </div>`;
+  document.getElementById("backBtn").addEventListener("click", () => history.back());
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+  if (state.role === "admin") {
+    document.getElementById("editBtn").addEventListener("click", () => openEditFeedback(r));
+    document.getElementById("delBtn").addEventListener("click", async () => {
+      if (!confirm(`Delete feedback ${r.feedbackId}? This cannot be undone.`)) return;
+      await Fs.deleteDoc(Fs.doc(db, "feedback", id));
+      await writeAudit("Feedback deleted", id);
+      toast("Feedback deleted.", "success");
+      location.hash = "#/feedback";
+    });
+  }
+}
+function openEditFeedback(r) {
+  const editable = state.questionnaire.fields.filter((f) => f.type === "text" || f.type === "textarea");
+  openModal(`
+    <h3>Edit Feedback ${r.feedbackId}</h3>
+    ${editable.map((f) => `<div class="field"><label>${esc(f.label.replace(/\{location\}/g, r.locationName || "this location"))}</label>
+      ${f.type === "textarea" ? `<textarea data-edit-id="${f.id}">${esc(r[f.id] || "")}</textarea>` : `<input data-edit-id="${f.id}" value="${esc(r[f.id] || "")}">`}</div>`).join("") || `<p style="color:var(--ink-soft)">There are no free-text questions to edit.</p>`}
+    <p style="font-size:12.5px;color:var(--ink-soft)">Edits are logged with your name and timestamp in the Audit Log.</p>
+    <div class="modal-actions"><button class="btn btn-outline" id="eCancel">Cancel</button><button class="btn btn-gold" id="eSave">Save Changes</button></div>`);
+  document.getElementById("eCancel").addEventListener("click", closeModal);
+  document.getElementById("eSave").addEventListener("click", async () => {
+    const updates = { updatedAt: Fs.serverTimestamp(), editedBy: state.user.uid };
+    document.querySelectorAll("[data-edit-id]").forEach((el) => { updates[el.dataset.editId] = el.value.trim(); });
+    await Fs.updateDoc(Fs.doc(db, "feedback", r.feedbackId), updates);
+    await writeAudit("Feedback edited", r.feedbackId);
+    toast("Feedback updated.", "success"); closeModal(); router();
+  });
+}
+
+// ---- Locations ------------------------------------------------------
+async function viewLocations(main) {
+  await loadLocations();
+  main.innerHTML = `
+    <div class="panel card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0">Locations</h3><button class="btn btn-gold btn-sm" id="addLocBtn">+ Add Location</button>
+      </div>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Name</th><th>Status</th><th>Order</th><th>Notify Emails</th><th>Actions</th></tr></thead>
+        <tbody>${state.locations.map((l)=>`
+          <tr><td>${esc(l.name)}</td><td><span class="badge ${l.active?"green":"gray"}">${l.active?"Active":"Inactive"}</span></td><td>${l.displayOrder??"-"}</td>
+          <td>${(l.notifyEmails||[]).length ? `${l.notifyEmails.length} configured` : `<span class="badge gray">None set</span>`}</td>
+          <td style="white-space:normal"><a href="#" data-edit="${l.id}">Edit</a> · <a href="#" data-toggle="${l.id}">${l.active?"Deactivate":"Activate"}</a> · <a href="#/qrcodes">QR</a> · <a href="#" data-del="${l.id}" style="color:var(--red)">Delete</a></td></tr>`).join("")||`<tr><td colspan="5">No locations yet.</td></tr>`}</tbody>
+      </table></div>
+    </div>`;
+  document.getElementById("addLocBtn").addEventListener("click", () => openLocationModal());
+  main.querySelectorAll("[data-edit]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openLocationModal(state.locations.find((l)=>l.id===a.dataset.edit)); }));
+  main.querySelectorAll("[data-toggle]").forEach((a) => a.addEventListener("click", async (e) => {
+    e.preventDefault(); const loc = state.locations.find((l)=>l.id===a.dataset.toggle);
+    await Fs.updateDoc(Fs.doc(db,"locations",loc.id), { active: !loc.active, updatedAt: Fs.serverTimestamp() });
+    toast(`Location ${!loc.active?"activated":"deactivated"}.`, "success"); router();
+  }));
+  main.querySelectorAll("[data-del]").forEach((a) => a.addEventListener("click", async (e) => {
+    e.preventDefault(); if (!confirm("Delete this location? Historical feedback will be preserved. Consider deactivating instead.")) return;
+    await Fs.deleteDoc(Fs.doc(db,"locations",a.dataset.del)); toast("Location deleted.", "success"); router();
+  }));
+}
+function openLocationModal(loc) {
+  const isEdit = !!loc;
+  openModal(`
+    <h3>${isEdit?"Edit":"Add"} Location</h3>
+    <div class="field"><label>Location Name</label><input id="lName" value="${esc(loc?.name||"")}"></div>
+    <div class="field"><label>Description</label><textarea id="lDesc">${esc(loc?.description||"")}</textarea></div>
+    <div class="field"><label>Display Order</label><input type="number" id="lOrder" value="${loc?.displayOrder ?? state.locations.length+1}"></div>
+    <div class="field">
+      <label>Notification Emails</label>
+      <input id="lNotifyEmails" value="${esc((loc?.notifyEmails||[]).join(", "))}" placeholder="manager@example.com, supervisor@example.com">
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">Comma-separated. These addresses get an email (via EmailJS — set up in Settings) every time a guest submits feedback for this location. They are visible in this page's source/network traffic while this location is active — see the note on the Email Destinations page.</div>
+    </div>
+    <div class="field"><label><input type="checkbox" id="lActive" style="width:auto;display:inline-block;margin-right:8px" ${loc?.active!==false?"checked":""}> Active</label></div>
+    <div class="modal-actions"><button class="btn btn-outline" id="lCancel">Cancel</button><button class="btn btn-gold" id="lSave">Save</button></div>`);
+  document.getElementById("lCancel").addEventListener("click", closeModal);
+  document.getElementById("lSave").addEventListener("click", async () => {
+    const name = document.getElementById("lName").value.trim();
+    if (!name) return toast("Location name is required.", "error");
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+    const notifyEmails = document.getElementById("lNotifyEmails").value.split(",").map((e)=>e.trim()).filter(Boolean);
+    const data = { name, description: document.getElementById("lDesc").value.trim(), displayOrder: Number(document.getElementById("lOrder").value)||0, notifyEmails, active: document.getElementById("lActive").checked, slug, updatedAt: Fs.serverTimestamp() };
+    if (isEdit) await Fs.updateDoc(Fs.doc(db,"locations",loc.id), data);
+    else { data.createdAt = Fs.serverTimestamp(); await Fs.addDoc(Fs.collection(db,"locations"), data); }
+    toast("Location saved.", "success"); closeModal(); router();
+  });
+}
+
+// ---- Users ------------------------------------------------------
+async function viewUsers(main) {
+  const snap = await Fs.getDocs(Fs.collection(db, "users"));
+  const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  main.innerHTML = `
+    <div class="panel card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0">Users</h3><button class="btn btn-gold btn-sm" id="addUserBtn">+ Add User</button>
+      </div>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin-top:-6px">To permanently remove a login, deactivate it here, then optionally delete the account in Firebase Console → Authentication.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Assigned Locations</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+        <tbody>${users.map((u)=>`
+          <tr><td>${esc(u.fullName)}</td><td>${esc(u.email)}</td><td><span class="badge ${u.role==="admin"?"gray":"green"}">${u.role}</span></td>
+          <td>${u.role==="admin"?"All":(u.assignedLocationIds||[]).map(locName).join(", ")||"-"}</td>
+          <td><span class="badge ${u.active?"green":"red"}">${u.active?"Active":"Disabled"}</span></td><td>${fmtDateTime(u.lastLoginAt)}</td>
+          <td style="white-space:normal"><a href="#" data-edit="${u.id}">Edit</a> · <a href="#" data-reset="${esc(u.email)}">Send Password Reset</a> ${u.id!==state.user.uid?`· <a href="#" data-toggleactive="${u.id}">${u.active?"Deactivate":"Reactivate"}</a>`:""}</td></tr>`).join("")||`<tr><td colspan="7">No users yet.</td></tr>`}</tbody>
+      </table></div>
+    </div>`;
+  document.getElementById("addUserBtn").addEventListener("click", () => openUserModal(null, users));
+  main.querySelectorAll("[data-edit]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openUserModal(users.find((u)=>u.id===a.dataset.edit), users); }));
+  main.querySelectorAll("[data-reset]").forEach((a) => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try { await Auth.sendPasswordResetEmail(auth, a.dataset.reset); toast("Password reset email sent.", "success"); }
+    catch (err) { toast("Could not send reset email.", "error"); }
+  }));
+  main.querySelectorAll("[data-toggleactive]").forEach((a) => a.addEventListener("click", async (e) => {
+    e.preventDefault(); const u = users.find((x)=>x.id===a.dataset.toggleactive);
+    await Fs.updateDoc(Fs.doc(db,"users",u.id), { active: !u.active, updatedAt: Fs.serverTimestamp() });
+    await writeAudit(u.active?"User deactivated":"User reactivated", u.email);
+    toast("Updated.", "success"); router();
+  }));
+}
+function openUserModal(user, allUsers) {
+  const isEdit = !!user;
+  openModal(`
+    <h3>${isEdit?"Edit":"Add"} User</h3>
+    <div class="field"><label>Full Name</label><input id="uName" value="${esc(user?.fullName||"")}"></div>
+    <div class="field"><label>Email</label><input id="uEmail" type="email" value="${esc(user?.email||"")}" ${isEdit?"disabled":""}></div>
+    ${!isEdit?`<div class="field"><label>Password (min 8 characters)</label><input id="uPassword" type="password"></div>`:""}
+    <div class="field"><label>Role</label><select id="uRole"><option value="user" ${user?.role==="user"?"selected":""}>User</option><option value="admin" ${user?.role==="admin"?"selected":""}>Admin</option></select></div>
+    <div class="field" id="uLocWrap"><label>Assigned Locations (Users only)</label>
+      <div class="checkbox-list">${state.locations.map((l)=>`<label><input type="checkbox" value="${l.id}" ${(user?.assignedLocationIds||[]).includes(l.id)?"checked":""}> ${esc(l.name)}</label>`).join("")}</div></div>
+    <div class="modal-actions"><button class="btn btn-outline" id="uCancel">Cancel</button><button class="btn btn-gold" id="uSave">Save</button></div>`);
+  const toggleLocWrap = () => { document.getElementById("uLocWrap").style.display = document.getElementById("uRole").value==="admin"?"none":"block"; };
+  document.getElementById("uRole").addEventListener("change", toggleLocWrap); toggleLocWrap();
+  document.getElementById("uCancel").addEventListener("click", closeModal);
+  document.getElementById("uSave").addEventListener("click", async () => {
+    const fullName = document.getElementById("uName").value.trim();
+    const role = document.getElementById("uRole").value;
+    const assignedLocationIds = Array.from(document.querySelectorAll("#uLocWrap input:checked")).map((c) => c.value);
+    try {
+      if (isEdit) {
+        await Fs.updateDoc(Fs.doc(db,"users",user.id), { fullName, role, assignedLocationIds: role==="admin"?[]:assignedLocationIds, updatedAt: Fs.serverTimestamp() });
+        await writeAudit("User edited", user.email);
+      } else {
+        const email = document.getElementById("uEmail").value.trim();
+        const password = document.getElementById("uPassword").value;
+        if (!email || password.length < 8) return toast("Valid email and 8+ character password required.", "error");
+        if (allUsers.some((u) => u.email === email)) return toast("A user with this email already exists.", "error");
+        const cred = await Auth.createUserWithEmailAndPassword(secondaryAuth, email, password);
+        await Fs.setDoc(Fs.doc(db,"users",cred.user.uid), { fullName: fullName||email, email, role, assignedLocationIds: role==="admin"?[]:assignedLocationIds, active: true, createdAt: Fs.serverTimestamp(), updatedAt: Fs.serverTimestamp(), lastLoginAt: null });
+        await secondaryAuth.signOut();
+        await writeAudit("User created", `${email} (${role})`);
+      }
+      toast("User saved.", "success"); closeModal(); router();
+    } catch (err) { console.error(err); toast(err.message || "Could not save user.", "error"); }
+  });
+}
+
+// ---- Email Destinations ------------------------------------------------------
+async function viewEmails(main) {
+  const snap = await Fs.getDocs(Fs.collection(db, "emailRecipients"));
+  const recips = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  main.innerHTML = `
+    <div class="panel card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0">Email Destinations</h3><button class="btn btn-gold btn-sm" id="addEmailBtn">+ Add Email</button>
+      </div>
+      <p style="color:var(--amber);font-size:12.5px;margin-top:-6px">This list is for your own records only. Actual notification emails are sent per-location — set each location's addresses under <b>Locations → Edit → Notification Emails</b>, and configure the sender under <b>Settings → Email Notifications</b>.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Recipient Name</th><th>Email</th><th>Assigned Locations</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${recips.map((r)=>`
+          <tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${(r.locationIds||[]).map(locName).join(", ")||"-"}</td>
+          <td><span class="badge ${r.active?"green":"gray"}">${r.active?"Enabled":"Disabled"}</span></td>
+          <td><a href="#" data-edit="${r.id}">Edit</a> · <a href="#" data-del="${r.id}" style="color:var(--red)">Delete</a></td></tr>`).join("")||`<tr><td colspan="5">No email destinations configured yet.</td></tr>`}</tbody>
+      </table></div>
+    </div>`;
+  document.getElementById("addEmailBtn").addEventListener("click", () => openEmailModal(null));
+  main.querySelectorAll("[data-edit]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openEmailModal(recips.find((r)=>r.id===a.dataset.edit)); }));
+  main.querySelectorAll("[data-del]").forEach((a) => a.addEventListener("click", async (e) => { e.preventDefault(); if (!confirm("Delete this email destination?")) return; await Fs.deleteDoc(Fs.doc(db,"emailRecipients",a.dataset.del)); toast("Deleted.", "success"); router(); }));
+}
+function openEmailModal(recip) {
+  const isEdit = !!recip;
+  openModal(`
+    <h3>${isEdit?"Edit":"Add"} Email Destination</h3>
+    <div class="field"><label>Recipient Name</label><input id="erName" value="${esc(recip?.name||"")}"></div>
+    <div class="field"><label>Email Address</label><input id="erEmail" type="email" value="${esc(recip?.email||"")}"></div>
+    <div class="field"><label>Assigned Locations</label><div class="checkbox-list">${state.locations.map((l)=>`<label><input type="checkbox" value="${l.id}" ${(recip?.locationIds||[]).includes(l.id)?"checked":""}> ${esc(l.name)}</label>`).join("")}</div></div>
+    <div class="field"><label><input type="checkbox" id="erActive" style="width:auto;display:inline-block;margin-right:8px" ${recip?.active!==false?"checked":""}> Enabled</label></div>
+    <div class="modal-actions"><button class="btn btn-outline" id="erCancel">Cancel</button><button class="btn btn-gold" id="erSave">Save</button></div>`);
+  document.getElementById("erCancel").addEventListener("click", closeModal);
+  document.getElementById("erSave").addEventListener("click", async () => {
+    const email = document.getElementById("erEmail").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast("Enter a valid email address.", "error");
+    const locationIds = Array.from(document.querySelectorAll(".checkbox-list input:checked")).map((c) => c.value);
+    const data = { name: document.getElementById("erName").value.trim(), email, locationIds, active: document.getElementById("erActive").checked, updatedAt: Fs.serverTimestamp() };
+    if (isEdit) await Fs.updateDoc(Fs.doc(db,"emailRecipients",recip.id), data);
+    else { data.createdAt = Fs.serverTimestamp(); await Fs.addDoc(Fs.collection(db,"emailRecipients"), data); }
+    toast("Saved.", "success"); closeModal(); router();
+  });
+}
+
+// ---- QR Codes ------------------------------------------------------
+async function viewQrCodes(main) {
+  main.innerHTML = `
+    <div class="panel card no-print">
+      <h3>General Feedback QR Code</h3>
+      <p style="color:var(--ink-soft);font-size:13px">Points at your feedback.html file — edit the URL below if it's hosted at a different address.</p>
+      <div class="field" style="max-width:420px"><input id="feedbackBaseUrl" value="${location.origin}/feedback.html"></div>
+      <div class="qr-tile card" style="max-width:220px" id="generalQr"></div>
+      <button class="btn btn-outline btn-sm" id="dlGeneral" style="margin-top:10px">Download PNG</button>
+      <button class="btn btn-outline btn-sm" id="refreshQr" style="margin-top:10px">Refresh QR Codes</button>
+    </div>
+    <div class="panel card"><h3>Location QR Codes</h3><div class="qr-grid" id="qrGrid"></div></div>`;
+
+  function draw() {
+    const baseUrl = document.getElementById("feedbackBaseUrl").value.trim() || `${location.origin}/feedback.html`;
+    document.getElementById("generalQr").innerHTML = "";
+    new QRCode(document.getElementById("generalQr"), { text: baseUrl, width: 180, height: 180 });
+    const grid = document.getElementById("qrGrid"); grid.innerHTML = "";
+    state.locations.forEach((l) => {
+      const tile = document.createElement("div"); tile.className = "qr-tile card";
+      tile.innerHTML = `<div style="font-weight:700;margin-bottom:10px">${esc(l.name)}</div><div class="qrcanvas"></div>
+        <div style="font-size:11px;color:var(--ink-soft);margin:8px 0">Scan to share your experience</div>
+        <button class="btn btn-outline btn-sm dlBtn" style="width:100%;margin-top:4px">Download PNG</button>
+        <button class="btn btn-outline btn-sm printBtn" style="width:100%;margin-top:6px">Print Card</button>`;
+      grid.appendChild(tile);
+      const url = `${baseUrl}?location=${encodeURIComponent(l.slug || l.id)}`;
+      new QRCode(tile.querySelector(".qrcanvas"), { text: url, width: 150, height: 150 });
+      tile.querySelector(".dlBtn").addEventListener("click", () => downloadQrCanvas(tile.querySelector(".qrcanvas"), `${l.slug||l.id}-qr.png`));
+      tile.querySelector(".printBtn").addEventListener("click", () => {
+        const w = window.open("", "_blank");
+        w.document.write(`<html><body style="text-align:center;font-family:sans-serif;padding:60px">
+          <div style="font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#555">${esc(state.orgName)}</div>
+          <h1 style="margin:14px 0">${esc(l.name)}</h1>
+          <img src="${tile.querySelector("canvas").toDataURL()}" style="width:260px;height:260px">
+          <p style="margin-top:18px;font-size:15px">We value your feedback. Scan to share your experience.</p></body></html>`);
+        w.document.close(); w.print();
+      });
+    });
+  }
+  draw();
+  document.getElementById("dlGeneral").addEventListener("click", () => downloadQrCanvas(document.getElementById("generalQr"), "general-feedback-qr.png"));
+  document.getElementById("refreshQr").addEventListener("click", draw);
+}
+function downloadQrCanvas(container, filename) {
+  const canvas = container.querySelector("canvas");
+  const a = document.createElement("a"); a.href = canvas.toDataURL("image/png"); a.download = filename; a.click();
+}
+
+// ---- Backup & Restore ------------------------------------------------------
+async function viewBackup(main) {
+  main.innerHTML = `
+    <div class="panel card"><h3>Backup Now</h3>
+      <p style="color:var(--ink-soft);font-size:13px">Downloads a JSON backup of feedback, locations, email destinations and settings (excludes login passwords).</p>
+      <button class="btn btn-gold" id="backupBtn">Backup Now</button>
+      <div id="backupResult" style="margin-top:12px;font-size:13.5px"></div>
+    </div>
+    <div class="panel card"><h3>Restore Backup</h3>
+      <p style="color:var(--red);font-size:13.5px;font-weight:600">⚠ Restoring a backup may replace or modify existing system data. Please make sure you have created a current backup before continuing.</p>
+      <input type="file" id="restoreFile" accept="application/json" style="margin-bottom:12px">
+      <div id="restorePreview"></div>
+    </div>`;
+  document.getElementById("backupBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("backupBtn"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Backing up…`;
+    try {
+      const collections = ["feedback","locations","emailRecipients","settings"];
+      const out = { createdAt: new Date().toISOString(), collections: {} }; let totalRecords = 0;
+      for (const c of collections) { const snap = await Fs.getDocs(Fs.collection(db,c)); out.collections[c] = snap.docs.map((d)=>({id:d.id,data:d.data()})); totalRecords += out.collections[c].length; }
+      const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+      downloadFile(`GuestFeedback_Backup_${stamp}.json`, JSON.stringify(out,null,2), "application/json");
+      document.getElementById("backupResult").innerHTML = `<span class="badge green">Done</span> ${totalRecords} records backed up at ${new Date().toLocaleString()}.`;
+      await writeAudit("Backup created", `${totalRecords} records`);
+    } catch (err) { toast("Backup failed: " + err.message, "error"); }
+    finally { btn.disabled = false; btn.textContent = "Backup Now"; }
+  });
+  document.getElementById("restoreFile").addEventListener("change", async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data.collections || !data.collections.feedback) throw new Error("invalid");
+      const counts = Object.fromEntries(Object.entries(data.collections).map(([k,v])=>[k,v.length]));
+      document.getElementById("restorePreview").innerHTML = `
+        <div class="card" style="padding:14px;margin-bottom:12px">
+          <div><b>Backup date:</b> ${data.createdAt||"unknown"}</div>
+          <div><b>Feedback records:</b> ${counts.feedback||0}</div>
+          <div><b>Locations:</b> ${counts.locations||0}</div>
+          <div><b>Email configurations:</b> ${counts.emailRecipients||0}</div>
+        </div>
+        <button class="btn btn-outline" id="mergeBtn">Merge Data (add missing only)</button>
+        <button class="btn btn-danger" id="replaceBtn" style="margin-left:10px">Replace Data</button>`;
+      document.getElementById("mergeBtn").addEventListener("click", () => runRestore(data, "merge"));
+      document.getElementById("replaceBtn").addEventListener("click", () => runRestore(data, "replace"));
+    } catch (err) { document.getElementById("restorePreview").innerHTML = `<p style="color:var(--red)">This file is not a valid backup and cannot be restored.</p>`; }
+  });
+}
+async function runRestore(data, mode) {
+  if (!confirm(mode==="replace" ? "This will REPLACE existing records with the backup. Continue?" : "This will ADD missing records from the backup without deleting existing data. Continue?")) return;
+  let written = 0;
+  for (const [coll, docs] of Object.entries(data.collections)) {
+    for (const { id, data: docData } of docs) {
+      const ref = Fs.doc(db, coll, id);
+      if (mode === "merge") { const existing = await Fs.getDoc(ref); if (existing.exists()) continue; }
+      await Fs.setDoc(ref, docData); written++;
+    }
+  }
+  await writeAudit("Restore performed", `${mode}: ${written} records written`);
+  toast(`Restore complete. ${written} records written.`, "success");
+  loadLocations();
+}
+
+// ---- Settings ------------------------------------------------------
+async function viewSettings(main) {
+  const snap = await Fs.getDoc(Fs.doc(db, "settings", "general"));
+  const s = snap.exists() ? snap.data() : {};
+  main.innerHTML = `
+    <div class="panel card"><h3>Organization Branding</h3>
+      <div class="field"><label>Organization Name</label><input id="sName" value="${esc(s.organizationName||"")}"></div>
+      <div class="field"><label>Address</label><input id="sAddress" value="${esc(s.address||"")}"></div>
+      <div class="field"><label>Telephone</label><input id="sPhone" value="${esc(s.phone||"")}"></div>
+      <div class="field"><label>Email</label><input id="sEmail" value="${esc(s.email||"")}"></div>
+      <div class="field"><label>Website</label><input id="sWebsite" value="${esc(s.website||"")}"></div>
+      <div class="field"><label>Footer Text</label><input id="sFooter" value="${esc(s.footerText||"")}"></div>
+    </div>
+    <div class="panel card">
+      <h3>Email Notifications (EmailJS)</h3>
+      <p style="color:var(--ink-soft);font-size:13px">
+        This system has no private server, so it uses <a href="https://www.emailjs.com" target="_blank" rel="noopener">EmailJS</a>
+        (free tier available) to send feedback notifications straight from the guest's browser. Create a free EmailJS account,
+        add an Email Service (e.g. connect Gmail), create a Template with the variables listed below, then paste the three IDs here.
+        Then add each location's notification emails under <b>Locations → Edit</b>.
+      </p>
+      <div class="field"><label>EmailJS Service ID</label><input id="sEjsService" value="${esc(s.emailjsServiceId||"")}" placeholder="e.g. service_abc1234"></div>
+      <div class="field"><label>EmailJS Template ID</label><input id="sEjsTemplate" value="${esc(s.emailjsTemplateId||"")}" placeholder="e.g. template_xyz789"></div>
+      <div class="field" style="margin-bottom:0"><label>EmailJS Public Key</label><input id="sEjsKey" value="${esc(s.emailjsPublicKey||"")}" placeholder="e.g. AbCdEfGhIjKlMnOp"></div>
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--ink-soft)">Template variables to use in EmailJS</summary>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px">
+          In your EmailJS template, set "To Email" to <code>{{to_email}}</code>, and use these in the subject/body:<br>
+          <code>{{location_name}} {{feedback_id}} {{date_of_visit}} {{server_name}} {{recommendation}}
+          {{rating_menu}} {{rating_food}} {{rating_service}} {{rating_atmosphere}} {{rating_value}} {{rating_overall}}
+          {{liked_best}} {{improvement_suggestion}} {{guest_name}} {{guest_contact}} {{guest_email}}</code><br><br>
+          If you've customized the questionnaire below, the named ones above may not all apply — use
+          <code>{{ratings_summary}}</code> (every rating question) and <code>{{answers_summary}}</code> (every other question) instead; they always reflect your current questions.
+        </p>
+      </details>
+    </div>
+    <div class="panel card">
+      <h3>Questionnaire Builder</h3>
+      <p style="color:var(--ink-soft);font-size:13px;margin-top:-6px">
+        Full control over the guest feedback form: the header, every question (add, edit, delete, reorder), and the
+        thank-you message. <b>Location</b> and <b>Date of Visit</b> always stay at the top of the form. Changes apply to new
+        submissions only — past feedback is never altered. Tip: put <code>{location}</code> in any question text and it becomes
+        the guest's chosen location (e.g. "What did you like best about {location}?").
+      </p>
+
+      <h4 style="margin:18px 0 8px">Header (top of the form)</h4>
+      <div class="field"><label>Header Title</label><input id="qHeaderTitle"></div>
+      <div class="field"><label>Header Message</label><textarea id="qHeaderMessage" style="min-height:70px"></textarea></div>
+
+      <h4 style="margin:22px 0 8px">Questions</h4>
+      <div id="qFieldsList"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <select id="qNewType" style="flex:0 0 200px">
+          <option value="text">Short text answer</option>
+          <option value="textarea">Long text answer</option>
+          <option value="choice">Choice (tap buttons)</option>
+          <option value="rating">Rating (Poor / Average / Excellent)</option>
+        </select>
+        <input id="qNewLabel" placeholder="Type the new question here" style="flex:1;min-width:200px">
+        <button class="btn btn-outline btn-sm" id="qAddBtn" style="flex-shrink:0">+ Add Question</button>
+      </div>
+
+      <h4 style="margin:22px 0 8px">Footer (thank-you screen after submitting)</h4>
+      <div class="field"><label>Thank-You Title</label><input id="qFooterTitle"></div>
+      <div class="field" style="margin-bottom:0"><label>Thank-You Message</label><textarea id="qFooterMessage" style="min-height:70px"></textarea></div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+        <button class="btn btn-gold" id="qSaveBtn">Save Questionnaire</button>
+        <button class="btn btn-outline" id="qResetBtn">Reset to Default Questionnaire</button>
+      </div>
+    </div>
+    <button class="btn btn-gold" id="saveSettingsBtn">Save Branding &amp; Email Settings</button>`;
+  document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
+    await Fs.setDoc(Fs.doc(db,"settings","general"), {
+      organizationName: document.getElementById("sName").value.trim(), address: document.getElementById("sAddress").value.trim(),
+      phone: document.getElementById("sPhone").value.trim(), email: document.getElementById("sEmail").value.trim(),
+      website: document.getElementById("sWebsite").value.trim(), footerText: document.getElementById("sFooter").value.trim(),
+      emailjsServiceId: document.getElementById("sEjsService").value.trim(),
+      emailjsTemplateId: document.getElementById("sEjsTemplate").value.trim(),
+      emailjsPublicKey: document.getElementById("sEjsKey").value.trim(),
+      updatedAt: Fs.serverTimestamp(),
+    }, { merge: true });
+    toast("Settings saved.", "success");
+  });
+
+  // ---- Questionnaire Builder ----
+  const TYPE_LABELS = { text: "Short text", textarea: "Long text", choice: "Choice", rating: "Rating" };
+  let workingQ = cloneQ(state.questionnaire);
+  document.getElementById("qHeaderTitle").value = workingQ.headerTitle;
+  document.getElementById("qHeaderMessage").value = workingQ.headerMessage;
+  document.getElementById("qFooterTitle").value = workingQ.footerTitle;
+  document.getElementById("qFooterMessage").value = workingQ.footerMessage;
+
+  function renderFieldsEditor() {
+    const list = document.getElementById("qFieldsList");
+    const n = workingQ.fields.length;
+    list.innerHTML = workingQ.fields.map((f, i) => `
+      <div class="card" style="padding:14px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <span class="badge gray">${i + 1}. ${TYPE_LABELS[f.type] || f.type}</span>
+          <input class="qLabel" data-i="${i}" value="${esc(f.label)}" style="flex:1;min-width:200px" aria-label="Question text">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:13px;white-space:nowrap;margin:0">
+            <input type="checkbox" class="qReq" data-i="${i}" style="width:auto" ${f.required ? "checked" : ""}> Required
+          </label>
+        </div>
+        ${f.type === "choice" ? `<input class="qOpts" data-i="${i}" value="${esc((f.options || []).join(", "))}" placeholder="Option 1, Option 2, Others" style="margin-bottom:4px" aria-label="Answer options">
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">Answer options, separated by commas. Include an option named <b>Others</b> to automatically show a "Please specify" box.</div>` : ""}
+        ${f.type === "text" || f.type === "textarea" ? `<input class="qPh" data-i="${i}" value="${esc(f.placeholder || "")}" placeholder="Hint text shown inside the empty answer box (optional)" style="margin-bottom:8px" aria-label="Hint text">` : ""}
+        ${f.type === "text" ? `<select class="qIn" data-i="${i}" style="margin-bottom:8px" aria-label="Answer type">
+            <option value="text" ${(f.inputType || "text") === "text" ? "selected" : ""}>Plain text</option>
+            <option value="email" ${f.inputType === "email" ? "selected" : ""}>Email address (validated)</option>
+            <option value="tel" ${f.inputType === "tel" ? "selected" : ""}>Phone number</option>
+          </select>` : ""}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm qUp" data-i="${i}" ${i === 0 ? "disabled" : ""}>↑ Move up</button>
+          <button class="btn btn-outline btn-sm qDown" data-i="${i}" ${i === n - 1 ? "disabled" : ""}>↓ Move down</button>
+          <button class="btn btn-outline btn-sm qDel" data-i="${i}" style="color:var(--red);margin-left:auto">Delete</button>
+        </div>
+      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px">No questions yet — add one below.</p>`;
+
+    list.querySelectorAll(".qLabel").forEach((el) => el.addEventListener("input", (e) => { workingQ.fields[+e.target.dataset.i].label = e.target.value; }));
+    list.querySelectorAll(".qReq").forEach((el) => el.addEventListener("change", (e) => { workingQ.fields[+e.target.dataset.i].required = e.target.checked; }));
+    list.querySelectorAll(".qOpts").forEach((el) => el.addEventListener("input", (e) => { workingQ.fields[+e.target.dataset.i].options = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); }));
+    list.querySelectorAll(".qPh").forEach((el) => el.addEventListener("input", (e) => { workingQ.fields[+e.target.dataset.i].placeholder = e.target.value; }));
+    list.querySelectorAll(".qIn").forEach((el) => el.addEventListener("change", (e) => { workingQ.fields[+e.target.dataset.i].inputType = e.target.value; }));
+    list.querySelectorAll(".qUp").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.i; [workingQ.fields[i - 1], workingQ.fields[i]] = [workingQ.fields[i], workingQ.fields[i - 1]]; renderFieldsEditor(); }));
+    list.querySelectorAll(".qDown").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.i; [workingQ.fields[i + 1], workingQ.fields[i]] = [workingQ.fields[i], workingQ.fields[i + 1]]; renderFieldsEditor(); }));
+    list.querySelectorAll(".qDel").forEach((b) => b.addEventListener("click", () => {
+      const f = workingQ.fields[+b.dataset.i];
+      if (!confirm(`Delete this question?\n\n"${f.label}"\n\nGuests will no longer be asked it. Answers already collected are kept.`)) return;
+      workingQ.fields.splice(+b.dataset.i, 1); renderFieldsEditor();
+    }));
+  }
+  renderFieldsEditor();
+
+  document.getElementById("qAddBtn").addEventListener("click", () => {
+    const label = document.getElementById("qNewLabel").value.trim();
+    if (!label) return toast("Type the question first.", "error");
+    const type = document.getElementById("qNewType").value;
+    const field = { id: toCamelId(label, workingQ.fields.map((f) => f.id)), type, label, required: type === "rating" };
+    if (type === "choice") field.options = ["Option 1", "Option 2"];
+    if (type === "text") field.inputType = "text";
+    if (type === "text" || type === "textarea") field.placeholder = "";
+    workingQ.fields.push(field);
+    document.getElementById("qNewLabel").value = "";
+    renderFieldsEditor();
+    toast("Question added at the bottom — use ↑ to move it where you want.", "success");
+  });
+  document.getElementById("qNewLabel").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("qAddBtn").click(); } });
+
+  document.getElementById("qResetBtn").addEventListener("click", () => {
+    if (!confirm("Reset the whole questionnaire (header, questions, thank-you message) back to the original default? You still need to click Save afterwards.")) return;
+    workingQ = cloneQ(DEFAULT_QUESTIONNAIRE);
+    document.getElementById("qHeaderTitle").value = workingQ.headerTitle;
+    document.getElementById("qHeaderMessage").value = workingQ.headerMessage;
+    document.getElementById("qFooterTitle").value = workingQ.footerTitle;
+    document.getElementById("qFooterMessage").value = workingQ.footerMessage;
+    renderFieldsEditor();
+  });
+
+  document.getElementById("qSaveBtn").addEventListener("click", async () => {
+    workingQ.headerTitle = document.getElementById("qHeaderTitle").value.trim();
+    workingQ.headerMessage = document.getElementById("qHeaderMessage").value.trim();
+    workingQ.footerTitle = document.getElementById("qFooterTitle").value.trim();
+    workingQ.footerMessage = document.getElementById("qFooterMessage").value.trim();
+    if (!workingQ.headerTitle) return toast("The header title can't be empty.", "error");
+    if (workingQ.fields.some((f) => !f.label.trim())) return toast("Every question needs some text.", "error");
+    if (workingQ.fields.some((f) => f.type === "choice" && (f.options || []).length < 2)) return toast("Choice questions need at least 2 answer options.", "error");
+    const btn = document.getElementById("qSaveBtn"); btn.disabled = true;
+    try {
+      await Fs.setDoc(Fs.doc(db, "settings", "questionnaire"), {
+        headerTitle: workingQ.headerTitle, headerMessage: workingQ.headerMessage,
+        footerTitle: workingQ.footerTitle, footerMessage: workingQ.footerMessage,
+        fields: workingQ.fields, updatedAt: Fs.serverTimestamp(),
+      }, { merge: true });
+      state.questionnaire = cloneQ(workingQ);
+      await writeAudit("Questionnaire updated", `${workingQ.fields.length} questions`);
+      toast("Questionnaire saved. New guest submissions will use it.", "success");
+    } catch (err) { console.error(err); toast("Could not save: " + err.message, "error"); }
+    finally { btn.disabled = false; }
+  });
+}
+
+// ---- Audit Log ------------------------------------------------------
+async function viewAudit(main) {
+  const snap = await Fs.getDocs(Fs.query(Fs.collection(db,"auditLogs"), Fs.orderBy("at","desc"), Fs.limit(200)));
+  const logs = snap.docs.map((d) => d.data());
+  main.innerHTML = `<div class="panel card"><h3>Audit Log</h3><div class="table-scroll"><table>
+    <thead><tr><th>Date/Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+    <tbody>${logs.map((l)=>`<tr><td>${fmtDateTime(l.at)}</td><td>${esc(l.userEmail||l.userId)}</td><td>${esc(l.action)}</td><td>${esc(l.detail)}</td></tr>`).join("")||`<tr><td colspan="4">No audit entries yet.</td></tr>`}</tbody>
+  </table></div></div>`;
+}
+</script>
+</body>
+</html>

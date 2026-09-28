@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Share Your Feedback</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+:root{
+  --ink:#1c1a17;--ink-soft:#5a544c;--paper:#fbfaf7;--card:#ffffff;--line:#e6e1d8;
+  --gold:#a9852f;--gold-dark:#8a6c24;--gold-tint:#f6efdd;
+  --green:#2f6d4f;--green-tint:#e9f3ee;--red:#a4372c;--red-tint:#fbeae8;
+  --amber:#a8760f;--amber-tint:#faf1de;--shadow:0 4px 18px rgba(28,26,23,.06);--shadow-lg:0 12px 40px rgba(28,26,23,.14);
+  --font:"Georgia","Iowan Old Style",serif;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;padding:0;overflow-x:hidden}
+body{font-family:var(--font-ui);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));line-height:1.5;font-size:16px}
+h1,h2,.serif{font-family:var(--font)}
+button{font-family:inherit;-webkit-appearance:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:12px;
+  padding:14px 20px;font-size:16px;font-weight:600;cursor:pointer;transition:.15s ease;background:var(--ink);color:#fff;
+  min-height:50px;touch-action:manipulation}
+.btn:hover{opacity:.92}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.btn-gold{background:var(--gold);color:#fff}
+.btn.btn-outline{background:transparent;border-color:var(--line);color:var(--ink)}
+/* font-size:16px on inputs stops iOS Safari from auto-zooming in on focus */
+input,select,textarea{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;
+  font-family:var(--font-ui);background:#fff;color:var(--ink);min-height:48px}
+textarea{min-height:100px;resize:vertical;line-height:1.5}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+input::placeholder,textarea::placeholder{color:#a39c8f}
+label{font-size:14px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:7px;line-height:1.35}
+.hint{font-size:12.5px;color:var(--ink-soft);margin-top:6px;line-height:1.4}
+.toast-wrap{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));right:14px;left:14px;z-index:9999;
+  display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.toast{background:var(--ink);color:#fff;padding:13px 16px;border-radius:12px;box-shadow:var(--shadow-lg);font-size:14.5px;
+  max-width:420px;margin:0 auto;width:100%;text-align:center;line-height:1.4}
+.toast.error{background:var(--red)}
+.toast.success{background:var(--green)}
+.spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.field{margin-bottom:20px}
+.required:after{content:" *";color:var(--red)}
+.hero{background:linear-gradient(135deg,var(--ink) 0%,#332c22 100%);color:#fff;
+  padding:calc(32px + env(safe-area-inset-top,0px)) 20px 30px;text-align:center}
+.hero .org{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.8;margin-bottom:12px}
+.hero h1{font-size:clamp(20px,5.5vw,24px);margin:0 0 10px;font-weight:600;line-height:1.3}
+.hero p{margin:0;opacity:.88;font-size:15px;line-height:1.55;max-width:340px;margin:0 auto}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px}
+.step-card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:20px 16px;margin:14px 0}
+.choice-row{display:flex;gap:10px;flex-wrap:wrap}
+.choice{flex:1;min-width:110px;min-height:52px;border:1.5px solid var(--line);border-radius:12px;padding:14px 8px;
+  text-align:center;cursor:pointer;font-weight:600;font-size:15px;background:#fff;display:flex;align-items:center;
+  justify-content:center;touch-action:manipulation;transition:.12s}
+.choice.selected{border-color:var(--gold);background:var(--gold-tint);color:var(--gold-dark)}
+.rating-block{margin-bottom:18px}
+.rating-block:last-child{margin-bottom:0}
+.rating-block .cat-name{font-weight:700;font-size:15.5px;margin-bottom:9px;color:var(--ink)}
+.rating-opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.rating-opt{border:1.5px solid var(--line);border-radius:11px;padding:12px 4px;text-align:center;font-size:12.5px;
+  font-weight:700;cursor:pointer;background:#fff;min-height:46px;display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;transition:.12s}
+.rating-opt[data-v="Poor"].selected{border-color:var(--red);background:var(--red-tint);color:var(--red)}
+.rating-opt[data-v="Average"].selected{border-color:var(--amber);background:var(--amber-tint);color:var(--amber)}
+.rating-opt[data-v="Excellent"].selected{border-color:var(--green);background:var(--green-tint);color:var(--green)}
+.section-title{font-size:16.5px;font-weight:700;margin:0 0 14px;color:var(--ink);line-height:1.35}
+.section-sub{font-size:13px;color:var(--ink-soft);margin:-8px 0 16px;line-height:1.5}
+.submit-bar{position:sticky;bottom:0;background:linear-gradient(to top,var(--paper) 55%,transparent);
+  padding:16px 0 calc(10px + env(safe-area-inset-bottom,0px))}
+.submit-bar .btn{width:100%;padding:17px;font-size:16.5px;border-radius:13px;box-shadow:0 6px 20px rgba(28,26,23,.18)}
+.thankyou{text-align:center;padding:64px 20px 40px}
+.thankyou .check{width:76px;height:76px;border-radius:50%;background:var(--green-tint);color:var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 22px}
+.thankyou h2{font-size:21px;line-height:1.4;margin:0 0 10px}
+.thankyou p{font-size:15px;line-height:1.5}
+.err{color:var(--red);font-size:13px;margin-top:7px;display:none;line-height:1.4}
+.unavailable{max-width:420px;margin:70px auto;text-align:center;padding:0 22px}
+.unavailable h2{font-size:19px;line-height:1.4}
+.unavailable p{font-size:14.5px;color:var(--ink-soft);line-height:1.55}
+fieldset{border:none;padding:0;margin:0}
+
+/* Extra breathing room fix for very narrow phones (older SE, small Android) */
+@media (max-width:360px){
+  .wrap{padding:0 12px}
+  .step-card{padding:16px 12px}
+  .hero{padding-left:16px;padding-right:16px}
+  .rating-opt{font-size:11.5px;padding:10px 2px}
+  .choice{min-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!--
+============================================================================
+ SETUP (once): this page needs a Firebase project with Authentication
+ (Email/Password) and Firestore Database enabled — no Cloud Functions, no
+ Storage, no billing plan, no CLI. It talks to the SAME Firebase project as
+ your admin-dashboard.html file (paste the same config into both, and the
+ same Firestore Rules once in the Firebase Console — see the rules block
+ in admin-dashboard.html, or ask for it again any time).
+ Then: fill in FIREBASE CONFIG below, host this one file anywhere (Firebase
+
+ Hosting, Netlify, GitHub Pages, your own server) and point QR codes at it,
+ e.g. yoursite.com/feedback.html?location=al-borj
+============================================================================
+-->
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<div id="unavailableView" class="unavailable" style="display:none">
+  <h2>This feedback link is no longer available</h2>
+  <p>Please scan the current QR code at this location, or contact our team directly.</p>
+</div>
+
+<div id="formWrapView">
+  <div class="hero">
+    <div class="org" id="orgNamePublic">GUEST FEEDBACK SYSTEM</div>
+    <h1 id="pf-heroTitle">We appreciate your feedback</h1>
+    <p id="pf-heroMessage">Please take a moment to share your comments by completing this short form.</p>
+  </div>
+  <div class="wrap">
+    <form id="feedbackForm" novalidate>
+      <div class="step-card">
+        <div class="field">
+          <label class="required" for="pf-location">Where did you visit?</label>
+          <select id="pf-location" required><option value="">Choose a location…</option></select>
+          <div id="pf-lockedNote" class="hint" style="display:none">📍 Location selected via QR code — thanks for scanning!</div>
+        </div>
+        <div class="field" style="margin-bottom:0"><label class="required" for="pf-date">Date of Visit</label><input type="date" id="pf-date" required></div>
+      </div>
+
+      <!-- Everything below is fully admin-configurable — add, edit, delete,
+           and reorder questions in admin.html → Settings → Questionnaire
+           Builder. Rendered dynamically by the script below. -->
+      <div id="dynamicFields"></div>
+
+      <div class="submit-bar"><button type="submit" class="btn btn-gold" id="pf-submitBtn">Submit Feedback</button></div>
+    </form>
+
+    <div id="pf-thankyouView" class="thankyou" style="display:none">
+      <div class="check">✓</div>
+      <h2 id="pf-thankyouTitle">Thank you for your constructive feedback!</h2>
+      <p style="color:var(--ink-soft)" id="pf-thankyouMessage">It genuinely helps us improve our service for you and every guest after you.</p>
+      <button class="btn btn-outline" id="pf-anotherBtn" style="margin-top:20px">Submit another feedback</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ============================================================================
+// FIREBASE CONFIG — same project/config as your admin-dashboard.html file.
+// ============================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+  authDomain: "guest-feedback-f27fb.firebaseapp.com",
+  projectId: "guest-feedback-f27fb",
+  storageBucket: "guest-feedback-f27fb.firebasestorage.app",
+  messagingSenderId: "640014161549",
+  appId: "1:640014161549:web:1845a04aa2e8350692b4c4"
+};
+
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import * as Fs from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const db = Fs.getFirestore(app);
+
+function toast(msg, type = "") {
+  const wrap = document.getElementById("toastWrap");
+  const t = document.createElement("div");
+  t.className = "toast " + type; t.textContent = msg;
+  wrap.appendChild(t); setTimeout(() => t.remove(), 4500);
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+// The questionnaire below (header text, every question, the thank-you
+// message) is the built-in starting point. The admin can fully customize
+// it in admin.html → Settings → Questionnaire Builder — add, edit, delete
+// and reorder questions, and this form always renders whatever they last
+// saved. Location and Date of Visit are not part of this list — they're
+// fixed at the top since QR-code routing and date-based reports depend on
+// them. Any question's text can include the token {location} — it's
+// swapped for the guest's chosen location name (e.g. "What did you like
+// best about {location}?").
+const DEFAULT_QUESTIONNAIRE = {
+  headerTitle: "We appreciate your feedback",
+  headerMessage: "Please take a moment to share your comments by completing this short form.",
+  footerTitle: "Thank you for your constructive feedback!",
+  footerMessage: "It genuinely helps us improve our service for you and every guest after you.",
+  fields: [
+    { id: "serverName", type: "text", label: "Server's Name", required: false, placeholder: "If you remember it — totally optional", inputType: "text" },
+    { id: "recommendation", type: "choice", label: "Would you recommend us to your friends and family?", required: true, options: ["Yes", "No"] },
+    { id: "heardAboutUs", type: "choice", label: "How did you hear about us?", required: true, options: ["Friends", "Newspaper & Magazines", "Social Media", "Others"] },
+    { id: "menuSelection", type: "rating", label: "Menu Selection", required: true },
+    { id: "foodQuality", type: "rating", label: "Food Quality", required: true },
+    { id: "service", type: "rating", label: "Service", required: true },
+    { id: "atmosphere", type: "rating", label: "Atmosphere / Ambiance", required: true },
+    { id: "valueForMoney", type: "rating", label: "Value for Money", required: true },
+    { id: "overallExperience", type: "rating", label: "Overall Experience", required: true },
+    { id: "likedBest", type: "textarea", label: "What did you like best about {location}?", required: false, placeholder: "Tell us what stood out…" },
+    { id: "improvementSuggestion", type: "textarea", label: "What could we do to make your experience even better?", required: false, placeholder: "We'd love to hear your suggestions…" },
+    { id: "guestName", type: "text", label: "Name", required: false, placeholder: "Your name", inputType: "text" },
+    { id: "contactNumber", type: "text", label: "Contact No.", required: false, placeholder: "Phone number", inputType: "tel" },
+    { id: "guestEmail", type: "text", label: "Email", required: false, placeholder: "you@example.com", inputType: "email" },
+  ],
+};
+let questionnaire = DEFAULT_QUESTIONNAIRE;
+function currentLocationName() {
+  const loc = locationsData.find((l) => l.id === locationSelect.value);
+  return loc ? loc.name : "your visit";
+}
+function plainLabel(rawLabel) { return String(rawLabel).replace(/\{location\}/g, () => currentLocationName()); }
+function resolveLabel(rawLabel) { return esc(rawLabel).replace(/\{location\}/g, () => esc(currentLocationName())); }
+
+const dynamicFields = document.getElementById("dynamicFields");
+
+function fieldCardHTML(f) {
+  if (f.type === "choice") {
+    const hasOthers = (f.options || []).some((o) => o.trim().toLowerCase() === "others");
+    return `<div class="step-card" data-field="${f.id}">
+      <div class="field" style="margin-bottom:0">
+        <label class="${f.required ? "required" : ""}">${resolveLabel(f.label)}</label>
+        <div class="choice-row" data-choice-field="${f.id}">
+          ${(f.options || []).map((opt) => `<div class="choice" data-v="${esc(opt)}" style="flex:1 1 45%">${esc(opt)}</div>`).join("")}
+        </div>
+        ${hasOthers ? `<div class="field" data-other-wrap="${f.id}" style="display:none;margin:14px 0 0"><label>Please specify</label><input type="text" data-other-input="${f.id}" maxlength="150"></div>` : ""}
+      </div>
+    </div>`;
+  }
+  if (f.type === "textarea") {
+    return `<div class="step-card" data-field="${f.id}">
+      <div class="field" style="margin-bottom:0">
+        <label class="${f.required ? "required" : ""}" for="f-${f.id}">${resolveLabel(f.label)}</label>
+        <textarea id="f-${f.id}" maxlength="2000" placeholder="${esc(f.placeholder||"")}"></textarea>
+      </div>
+    </div>`;
+  }
+  if (f.type === "text") {
+    const inputMode = f.inputType === "email" ? ' inputmode="email"' : f.inputType === "tel" ? ' inputmode="tel"' : "";
+    return `<div class="step-card" data-field="${f.id}">
+      <div class="field" style="margin-bottom:0">
+        <label class="${f.required ? "required" : ""}" for="f-${f.id}">${resolveLabel(f.label)}</label>
+        <input type="${f.inputType || "text"}" id="f-${f.id}" maxlength="150" placeholder="${esc(f.placeholder||"")}"${inputMode}>
+      </div>
+    </div>`;
+  }
+  return ""; // rating handled separately, grouped
+}
+
+function renderDynamicFields(fields) {
+  let html = "";
+  let i = 0;
+  while (i < fields.length) {
+    if (fields[i].type === "rating") {
+      const group = [];
+      while (i < fields.length && fields[i].type === "rating") { group.push(fields[i]); i++; }
+      html += `<div class="step-card">
+        <div class="section-title" style="margin-bottom:4px">How was your experience?</div>
+        <p class="section-sub">A quick tap on each — Poor, Average, or Excellent.</p>
+        <fieldset>${group.map((f) => `
+          <div class="rating-block" data-field="${f.id}">
+            <div class="cat-name">${resolveLabel(f.label)}</div>
+            <div class="rating-opts" data-cat="${f.id}">
+              <div class="rating-opt" data-v="Poor">Poor</div>
+              <div class="rating-opt" data-v="Average">Average</div>
+              <div class="rating-opt" data-v="Excellent">Excellent</div>
+            </div>
+          </div>`).join("")}</fieldset>
+      </div>`;
+    } else {
+      html += fieldCardHTML(fields[i]);
+      i++;
+    }
+  }
+  dynamicFields.innerHTML = html;
+}
+// NOTE: the first call to renderDynamicFields() happens further below, after
+// locationSelect/locationsData exist — labels can reference {location}.
+
+// Event delegation — works for whatever fields are rendered now or later
+dynamicFields.addEventListener("click", (e) => {
+  const ratingOpt = e.target.closest(".rating-opt");
+  if (ratingOpt) {
+    const group = ratingOpt.closest(".rating-opts");
+    group.querySelectorAll(".rating-opt").forEach((o) => o.classList.remove("selected"));
+    ratingOpt.classList.add("selected");
+    return;
+  }
+  const choice = e.target.closest(".choice");
+  if (choice) {
+    const row = choice.closest(".choice-row");
+    row.querySelectorAll(".choice").forEach((o) => o.classList.remove("selected"));
+    choice.classList.add("selected");
+    const otherWrap = dynamicFields.querySelector(`[data-other-wrap="${row.dataset.choiceField}"]`);
+    if (otherWrap) otherWrap.style.display = choice.dataset.v.trim().toLowerCase() === "others" ? "block" : "none";
+  }
+});
+
+async function loadQuestionnaire() {
+  try {
+    const snap = await Fs.getDoc(Fs.doc(db, "settings", "questionnaire"));
+    if (snap.exists() && Array.isArray(snap.data().fields) && snap.data().fields.length) {
+      const d = snap.data();
+      questionnaire = {
+        headerTitle: d.headerTitle || DEFAULT_QUESTIONNAIRE.headerTitle,
+        headerMessage: d.headerMessage || DEFAULT_QUESTIONNAIRE.headerMessage,
+        footerTitle: d.footerTitle || DEFAULT_QUESTIONNAIRE.footerTitle,
+        footerMessage: d.footerMessage || DEFAULT_QUESTIONNAIRE.footerMessage,
+        fields: d.fields,
+      };
+      document.getElementById("pf-heroTitle").textContent = questionnaire.headerTitle;
+      document.getElementById("pf-heroMessage").textContent = questionnaire.headerMessage;
+      document.getElementById("pf-thankyouTitle").textContent = questionnaire.footerTitle;
+      document.getElementById("pf-thankyouMessage").textContent = questionnaire.footerMessage;
+      renderDynamicFields(questionnaire.fields);
+    }
+  } catch (e) { /* keep showing the default set if this fails */ }
+}
+loadQuestionnaire();
+
+function validEmail(v) { return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+// Validates every configured question and collects the guest's answers into
+// a plain object, ready to save. Returns { error } if something required
+// is missing, or { data } on success.
+function collectAnswers() {
+  const data = { ratings: {} };
+  for (const f of questionnaire.fields) {
+    if (f.type === "rating") {
+      const group = dynamicFields.querySelector(`.rating-opts[data-cat="${f.id}"]`);
+      const sel = group ? group.querySelector(".rating-opt.selected") : null;
+      if (f.required && !sel) return { error: `Please rate "${plainLabel(f.label)}".` };
+      data.ratings[f.id] = sel ? sel.dataset.v : null;
+    } else if (f.type === "choice") {
+      const row = dynamicFields.querySelector(`.choice-row[data-choice-field="${f.id}"]`);
+      const sel = row ? row.querySelector(".choice.selected") : null;
+      if (f.required && !sel) return { error: `Please answer "${plainLabel(f.label)}".` };
+      data[f.id] = sel ? sel.dataset.v : "";
+      const isOthers = sel && sel.dataset.v.trim().toLowerCase() === "others";
+      const otherInput = dynamicFields.querySelector(`[data-other-input="${f.id}"]`);
+      const otherVal = otherInput ? otherInput.value.trim() : "";
+      if (isOthers && !otherVal) return { error: `Please specify for "${plainLabel(f.label)}".` };
+      data[f.id + "Other"] = isOthers ? otherVal : "";
+    } else {
+      const el = document.getElementById(`f-${f.id}`);
+      const val = el ? el.value.trim() : "";
+      if (f.required && !val) return { error: `Please fill in "${plainLabel(f.label)}".` };
+      if (f.type === "text" && f.inputType === "email" && val && !validEmail(val)) return { error: `Please double-check the email address for "${plainLabel(f.label)}".` };
+      data[f.id] = val;
+    }
+  }
+  return { data };
+}
+
+const dateInput = document.getElementById("pf-date");
+const todayStr = new Date().toISOString().slice(0, 10);
+dateInput.max = todayStr; dateInput.value = todayStr;
+
+const params = new URLSearchParams(location.search);
+const qLocationSlug = params.get("location");
+const locationSelect = document.getElementById("pf-location");
+let locationsData = []; let lockedLocation = false;
+
+renderDynamicFields(questionnaire.fields); // first paint, doesn't wait on locations/questionnaire to finish loading
+
+// Re-paints just the {location} token in question labels without wiping
+// anything the guest has already typed/selected elsewhere in the form.
+function updateLocationTokens() {
+  dynamicFields.querySelectorAll("[data-field]").forEach((card) => {
+    const f = questionnaire.fields.find((x) => x.id === card.dataset.field);
+    if (!f || !f.label.includes("{location}")) return;
+    const labelEl = card.classList.contains("rating-block") ? card.querySelector(".cat-name") : card.querySelector("label");
+    if (labelEl) labelEl.innerHTML = resolveLabel(f.label);
+  });
+}
+locationSelect.addEventListener("change", updateLocationTokens);
+
+async function loadLocations() {
+  const q = Fs.query(Fs.collection(db, "locations"), Fs.where("active", "==", true));
+  const snap = await Fs.getDocs(q);
+  locationsData = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.displayOrder??0)-(b.displayOrder??0));
+  locationsData.forEach((loc) => { const opt = document.createElement("option"); opt.value = loc.id; opt.textContent = loc.name; locationSelect.appendChild(opt); });
+  if (qLocationSlug) {
+    const match = locationsData.find((l) => l.slug === qLocationSlug || l.id === qLocationSlug);
+    if (!match) { document.getElementById("formWrapView").style.display = "none"; document.getElementById("unavailableView").style.display = "block"; return; }
+    locationSelect.value = match.id; locationSelect.disabled = true; lockedLocation = true;
+    document.getElementById("pf-lockedNote").style.display = "block";
+  }
+  updateLocationTokens();
+}
+loadLocations().catch((err) => { console.error(err); toast("Could not load locations. Please refresh.", "error"); });
+
+// ---------------------------------------------------------------------------
+// Email notification (EmailJS) — best-effort, browser-side. Configure the
+// Service ID / Template ID / Public Key in admin.html → Settings, and add
+// each location's notification emails in admin.html → Locations → Edit.
+// If nothing is configured, this quietly does nothing (form still works).
+// ---------------------------------------------------------------------------
+let emailjsConfig = null;
+Fs.getDoc(Fs.doc(db, "settings", "general")).then((snap) => {
+  if (!snap.exists()) return;
+  const s = snap.data();
+  if (s.emailjsServiceId && s.emailjsTemplateId && s.emailjsPublicKey) {
+    emailjsConfig = { serviceId: s.emailjsServiceId, templateId: s.emailjsTemplateId, publicKey: s.emailjsPublicKey };
+    emailjs.init({ publicKey: emailjsConfig.publicKey });
+  }
+}).catch(() => {});
+
+async function sendNotificationEmails(loc, feedbackId, data) {
+  if (!emailjsConfig || !loc || !Array.isArray(loc.notifyEmails) || loc.notifyEmails.length === 0) return;
+  const nonRatingFields = questionnaire.fields.filter((f) => f.type !== "rating");
+  const ratingFields = questionnaire.fields.filter((f) => f.type === "rating");
+  const templateParams = {
+    location_name: loc.name,
+    feedback_id: feedbackId,
+    date_of_visit: data.dateOfVisit,
+    // Fixed names, kept for backward compatibility with the original default questions:
+    server_name: data.serverName || "-",
+    recommendation: data.recommendation || "-",
+    rating_menu: data.ratings.menuSelection,
+    rating_food: data.ratings.foodQuality,
+    rating_service: data.ratings.service,
+    rating_atmosphere: data.ratings.atmosphere,
+    rating_value: data.ratings.valueForMoney,
+    rating_overall: data.ratings.overallExperience,
+    liked_best: data.likedBest || "-",
+    improvement_suggestion: data.improvementSuggestion || "-",
+    guest_name: data.guestName || "-",
+    guest_contact: data.contactNumber || "-",
+    guest_email: data.guestEmail || "-",
+    // Always accurate regardless of how the questionnaire's been customized:
+    ratings_summary: ratingFields.map((f) => `${f.label}: ${data.ratings[f.id] || "-"}`).join(", "),
+    answers_summary: nonRatingFields.map((f) => `${f.label.replace(/\{location\}/g, loc.name)}: ${data[f.id] || "-"}`).join(", "),
+  };
+  for (const to_email of loc.notifyEmails) {
+    try { await emailjs.send(emailjsConfig.serviceId, emailjsConfig.templateId, { ...templateParams, to_email }); }
+    catch (err) { console.error("EmailJS send failed for", to_email, err); }
+  }
+}
+
+const form = document.getElementById("feedbackForm");
+const submitBtn = document.getElementById("pf-submitBtn");
+let submitting = false;
+const COOLDOWN_MS = 60 * 1000; // best-effort duplicate-submission guard (no backend to rate-limit server-side)
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (submitting) return;
+  const lastSubmit = Number(localStorage.getItem("gfs_lastSubmit") || 0);
+  if (Date.now() - lastSubmit < COOLDOWN_MS) { toast("You just submitted feedback. Please wait a moment before submitting again.", "error"); return; }
+
+  if (!locationSelect.value) return toast("Please choose where you visited.", "error");
+  if (!dateInput.value) return toast("Please choose the date of your visit.", "error");
+  if (dateInput.value > todayStr) return toast("The date of your visit can't be in the future.", "error");
+  const result = collectAnswers();
+  if (result.error) return toast(result.error, "error");
+
+  const loc = locationsData.find((l) => l.id === locationSelect.value);
+  submitting = true; submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner"></span> Submitting…`;
+
+  const feedbackData = {
+    locationId: locationSelect.value, locationName: loc ? loc.name : "",
+    dateOfVisit: dateInput.value,
+    ...result.data,
+  };
+
+  try {
+    const year = new Date().getFullYear();
+    const counterRef = Fs.doc(db, "counters", `feedback-${year}`);
+    const feedbackId = await Fs.runTransaction(db, async (tx) => {
+      const snap = await tx.get(counterRef);
+      const next = snap.exists() ? snap.data().value + 1 : 1;
+      tx.set(counterRef, { value: next });
+      return `FB-${year}-${String(next).padStart(6, "0")}`;
+    });
+
+    await Fs.setDoc(Fs.doc(db, "feedback", feedbackId), {
+      feedbackId, ...feedbackData,
+      submittedAt: Fs.serverTimestamp(), updatedAt: Fs.serverTimestamp(),
+      status: "new", createdBy: "guest", deleted: false,
+    });
+
+    sendNotificationEmails(loc, feedbackId, feedbackData); // best-effort, doesn't block the thank-you screen
+
+    localStorage.setItem("gfs_lastSubmit", String(Date.now()));
+    document.getElementById("feedbackForm").style.display = "none";
+    document.getElementById("pf-thankyouView").style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    console.error(err);
+    toast("We're sorry, but your feedback could not be submitted at this moment. Please try again.", "error");
+    submitting = false; submitBtn.disabled = false; submitBtn.textContent = "Submit Feedback";
+  }
+});
+
+document.getElementById("pf-anotherBtn").addEventListener("click", () => {
+  renderDynamicFields(questionnaire.fields); // rebuilding the dynamic questions gives a clean blank slate
+  if (!lockedLocation) locationSelect.value = "";
+  dateInput.value = todayStr;
+  updateLocationTokens();
+  document.getElementById("pf-thankyouView").style.display = "none";
+  document.getElementById("feedbackForm").style.display = "block";
+  submitting = false; submitBtn.disabled = false; submitBtn.textContent = "Submit Feedback";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+Fs.getDoc(Fs.doc(db, "settings", "general")).then((snap) => {
+  if (snap.exists() && snap.data().organizationName) document.getElementById("orgNamePublic").textContent = snap.data().organizationName;
+}).catch(() => {});
+</script>
+</body>
+</html>
