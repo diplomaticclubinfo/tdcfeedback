@@ -90,6 +90,9 @@ tr:hover td{background:#faf9f6}
 .checkbox-list{max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px}
 .checkbox-list label{display:flex;align-items:center;gap:8px;font-weight:500;color:var(--ink);padding:4px 0}
 .checkbox-list input{width:auto}
+.bi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ar-input{font-family:"Segoe UI","Tahoma","Geeza Pro","Noto Sans Arabic",var(--font-ui)}
+@media (max-width:700px){.bi-grid{grid-template-columns:1fr}}
 @media (max-width:900px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.hamburger{display:block}}
 @media print{.sidebar,.topbar,.no-print{display:none !important}.main{margin-left:0}body{background:#fff}}
 </style>
@@ -301,32 +304,85 @@ function downloadFile(filename, content, mime = "application/octet-stream") {
 // routing, per-location reports and date filters depend on them.
 // ---------------------------------------------------------------------------
 const DEFAULT_QUESTIONNAIRE = {
-  headerTitle: "We appreciate your feedback",
-  headerMessage: "Please take a moment to share your comments by completing this short form.",
-  footerTitle: "Thank you for your constructive feedback!",
-  footerMessage: "It genuinely helps us improve our service for you and every guest after you.",
+  headerTitle: { en: "We appreciate your feedback", ar: "نقدّر ملاحظاتكم" },
+  headerMessage: { en: "Please take a moment to share your comments by completing this short form.", ar: "يرجى تخصيص بضع دقائق لمشاركة ملاحظاتكم من خلال تعبئة هذا النموذج القصير." },
+  footerTitle: { en: "Thank you for your constructive feedback!", ar: "شكرًا لملاحظاتكم البنّاءة!" },
+  footerMessage: { en: "It genuinely helps us improve our service for you and every guest after you.", ar: "هذا يساعدنا فعليًا على تحسين خدماتنا لكم ولكل ضيف بعدكم." },
   fields: [
-    { id: "serverName", type: "text", label: "Server's Name", required: false, placeholder: "If you remember it — totally optional", inputType: "text" },
-    { id: "recommendation", type: "choice", label: "Would you recommend us to your friends and family?", required: true, options: ["Yes", "No"] },
-    { id: "heardAboutUs", type: "choice", label: "How did you hear about us?", required: true, options: ["Friends", "Newspaper & Magazines", "Social Media", "Others"] },
-    { id: "menuSelection", type: "rating", label: "Menu Selection", required: true },
-    { id: "foodQuality", type: "rating", label: "Food Quality", required: true },
-    { id: "service", type: "rating", label: "Service", required: true },
-    { id: "atmosphere", type: "rating", label: "Atmosphere / Ambiance", required: true },
-    { id: "valueForMoney", type: "rating", label: "Value for Money", required: true },
-    { id: "overallExperience", type: "rating", label: "Overall Experience", required: true },
-    { id: "likedBest", type: "textarea", label: "What did you like best about {location}?", required: false, placeholder: "Tell us what stood out…" },
-    { id: "improvementSuggestion", type: "textarea", label: "What could we do to make your experience even better?", required: false, placeholder: "We'd love to hear your suggestions…" },
-    { id: "guestName", type: "text", label: "Name", required: false, placeholder: "Your name", inputType: "text" },
-    { id: "contactNumber", type: "text", label: "Contact No.", required: false, placeholder: "Phone number", inputType: "tel" },
-    { id: "guestEmail", type: "text", label: "Email", required: false, placeholder: "you@example.com", inputType: "email" },
+    { id: "serverName", type: "text", required: false, inputType: "text",
+      label: { en: "Server's Name", ar: "اسم النادل" },
+      placeholder: { en: "If you remember it — totally optional", ar: "إذا كنت تتذكره — اختياري تمامًا" } },
+    { id: "recommendation", type: "choice", required: true,
+      label: { en: "Would you recommend us to your friends and family?", ar: "هل توصي بنا لأصدقائك وعائلتك؟" },
+      options: [{ en: "Yes", ar: "نعم" }, { en: "No", ar: "لا" }] },
+    { id: "heardAboutUs", type: "choice", required: true,
+      label: { en: "How did you hear about us?", ar: "كيف سمعت عنا؟" },
+      options: [
+        { en: "Friends", ar: "أصدقاء" },
+        { en: "Newspaper & Magazines", ar: "الصحف والمجلات" },
+        { en: "Social Media", ar: "وسائل التواصل الاجتماعي" },
+        { en: "Others", ar: "أخرى" },
+      ] },
+    { id: "menuSelection", type: "rating", required: true, label: { en: "Menu Selection", ar: "تشكيلة القائمة" } },
+    { id: "foodQuality", type: "rating", required: true, label: { en: "Food Quality", ar: "جودة الطعام" } },
+    { id: "service", type: "rating", required: true, label: { en: "Service", ar: "الخدمة" } },
+    { id: "atmosphere", type: "rating", required: true, label: { en: "Atmosphere / Ambiance", ar: "الأجواء" } },
+    { id: "valueForMoney", type: "rating", required: true, label: { en: "Value for Money", ar: "القيمة مقابل السعر" } },
+    { id: "overallExperience", type: "rating", required: true, label: { en: "Overall Experience", ar: "التجربة الإجمالية" } },
+    { id: "likedBest", type: "textarea", required: false,
+      label: { en: "What did you like best about {location}?", ar: "ما الذي أعجبك أكثر في {location}؟" },
+      placeholder: { en: "Tell us what stood out…", ar: "أخبرنا بما لفت انتباهك…" } },
+    { id: "improvementSuggestion", type: "textarea", required: false,
+      label: { en: "What could we do to make your experience even better?", ar: "ما الذي يمكننا فعله لتحسين تجربتك أكثر؟" },
+      placeholder: { en: "We'd love to hear your suggestions…", ar: "يسعدنا سماع اقتراحاتكم…" } },
+    { id: "guestName", type: "text", required: false, inputType: "text",
+      label: { en: "Name", ar: "الاسم" }, placeholder: { en: "Your name", ar: "اسمك" } },
+    { id: "contactNumber", type: "text", required: false, inputType: "tel",
+      label: { en: "Contact No.", ar: "رقم التواصل" }, placeholder: { en: "Phone number", ar: "رقم الهاتف" } },
+    { id: "guestEmail", type: "text", required: false, inputType: "email",
+      label: { en: "Email", ar: "البريد الإلكتروني" }, placeholder: { en: "you@example.com", ar: "you@example.com" } },
   ],
 };
 const cloneQ = (q) => JSON.parse(JSON.stringify(q));
 
+// Bilingual helpers. Every piece of guest-facing text is stored as { en, ar }.
+// en()/ar() also accept a plain string, from before Arabic support existed.
+const en = (v) => (v && typeof v === "object") ? (v.en || "") : (v || "");
+const ar = (v) => (v && typeof v === "object") ? (v.ar || "") : "";
+const pair = (v) => ({ en: en(v), ar: ar(v) });
+
+// Upgrades a questionnaire saved before Arabic support (plain strings) into
+// the bilingual shape. For anything the admin never changed from the built-in
+// default wording, the matching default Arabic is filled in automatically —
+// everything else keeps an empty Arabic side (guests then simply see English
+// until it's translated).
+function normalizeQuestionnaire(q) {
+  const D = DEFAULT_QUESTIONNAIRE;
+  const withDefaultAr = (val, defVal) => { const p = pair(val); if (!p.ar && defVal && p.en.trim() === en(defVal).trim()) p.ar = ar(defVal); return p; };
+  const out = {
+    headerTitle: withDefaultAr(q.headerTitle, D.headerTitle),
+    headerMessage: withDefaultAr(q.headerMessage, D.headerMessage),
+    footerTitle: withDefaultAr(q.footerTitle, D.footerTitle),
+    footerMessage: withDefaultAr(q.footerMessage, D.footerMessage),
+    fields: (q.fields || []).map((f) => {
+      const def = D.fields.find((x) => x.id === f.id);
+      const nf = { ...f, label: withDefaultAr(f.label, def && def.label) };
+      if (f.type === "text" || f.type === "textarea") nf.placeholder = withDefaultAr(f.placeholder, def && def.placeholder);
+      if (f.type === "choice") {
+        nf.options = (f.options || []).map((o) => {
+          const defOpt = def && (def.options || []).find((d) => en(d).trim().toLowerCase() === en(o).trim().toLowerCase());
+          return withDefaultAr(o, defOpt);
+        });
+      }
+      return nf;
+    }),
+  };
+  return out;
+}
+
 function catLabel(k) {
   const found = ((state.questionnaire || DEFAULT_QUESTIONNAIRE).fields).find((f) => f.id === k);
-  if (found) return found.label;
+  if (found) return en(found.label);
   return String(k).replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 }
 function toCamelId(label, existingIds) {
@@ -343,29 +399,28 @@ async function loadQuestionnaire() {
     if (snap.exists()) {
       const d = snap.data();
       if (Array.isArray(d.fields) && d.fields.length) {
-        state.questionnaire = {
-          headerTitle: d.headerTitle || DEFAULT_QUESTIONNAIRE.headerTitle,
-          headerMessage: d.headerMessage || DEFAULT_QUESTIONNAIRE.headerMessage,
-          footerTitle: d.footerTitle || DEFAULT_QUESTIONNAIRE.footerTitle,
-          footerMessage: d.footerMessage || DEFAULT_QUESTIONNAIRE.footerMessage,
+        state.questionnaire = normalizeQuestionnaire({
+          headerTitle: d.headerTitle || D0.headerTitle, headerMessage: d.headerMessage || D0.headerMessage,
+          footerTitle: d.footerTitle || D0.footerTitle, footerMessage: d.footerMessage || D0.footerMessage,
           fields: d.fields,
-        };
+        });
         return;
       }
-      // Migrate from the earlier "rating categories only" version, if that's what was saved.
+      // Migrate from the earliest "rating categories only" version, if that's what was saved.
       if (Array.isArray(d.ratingCategories) && d.ratingCategories.length) {
         const q = cloneQ(DEFAULT_QUESTIONNAIRE);
         const ratings = d.ratingCategories.map((c) => ({ id: c.id, type: "rating", label: c.label, required: true }));
         const nonRatings = q.fields.filter((f) => f.type !== "rating");
         const at = nonRatings.findIndex((f) => f.id === "likedBest");
         q.fields = [...nonRatings.slice(0, at), ...ratings, ...nonRatings.slice(at)];
-        state.questionnaire = q;
+        state.questionnaire = normalizeQuestionnaire(q);
         return;
       }
     }
   } catch (e) {}
   state.questionnaire = cloneQ(DEFAULT_QUESTIONNAIRE);
 }
+const D0 = DEFAULT_QUESTIONNAIRE;
 
 const state = { user: null, role: null, active: true, assignedLocationIds: [], profile: null, locations: [], questionnaire: cloneQ(DEFAULT_QUESTIONNAIRE), orgName: "Guest Feedback System" };
 
@@ -648,7 +703,7 @@ async function viewFeedbackList(main) {
   document.getElementById("fCsv").addEventListener("click", () => {
     const rows = applyClientFilters(fbCache);
     const qFields = state.questionnaire.fields;
-    const header = ["Feedback ID","Date of Visit","Location", ...qFields.map((f)=>f.label.replace(/\{location\}/g,"[location]")), "Submitted At"];
+    const header = ["Feedback ID","Date of Visit","Location", ...qFields.map((f)=>en(f.label).replace(/\{location\}/g,"[location]")), "Submitted At"];
     const cell = (r, f) => {
       if (f.type === "rating") return r.ratings?.[f.id] ?? "";
       let v = r[f.id] ?? "";
@@ -675,7 +730,7 @@ async function viewFeedbackDetail(main, id) {
   const SYSTEM_KEYS = new Set(["feedbackId","locationId","locationName","dateOfVisit","ratings","submittedAt","updatedAt","status","createdBy","deleted","deletedAt","deletedBy","editedBy","editHistory"]);
   const orphanKeys = Object.keys(r).filter((k) => !SYSTEM_KEYS.has(k) && !knownIds.has(k) && !(k.endsWith("Other") && knownIds.has(k.slice(0, -5))));
   const orphanRatingKeys = Object.keys(r.ratings || {}).filter((k) => !knownIds.has(k));
-  const label = (f) => esc(f.label.replace(/\{location\}/g, r.locationName || "this location"));
+  const label = (f) => esc(en(f.label).replace(/\{location\}/g, r.locationName || "this location"));
   const rowFor = (f) => {
     if (f.type === "rating") return `<tr><th style="width:40%">${label(f)}</th><td><span class="rating-chip ${r.ratings?.[f.id]}">${r.ratings?.[f.id] || "-"}</span></td></tr>`;
     if (f.type === "choice") { let v = r[f.id] || "-"; if (r[f.id + "Other"]) v += " — " + r[f.id + "Other"]; return `<tr><th style="width:40%">${label(f)}</th><td>${esc(v)}</td></tr>`; }
@@ -724,7 +779,7 @@ function openEditFeedback(r) {
   const editable = state.questionnaire.fields.filter((f) => f.type === "text" || f.type === "textarea");
   openModal(`
     <h3>Edit Feedback ${r.feedbackId}</h3>
-    ${editable.map((f) => `<div class="field"><label>${esc(f.label.replace(/\{location\}/g, r.locationName || "this location"))}</label>
+    ${editable.map((f) => `<div class="field"><label>${esc(en(f.label).replace(/\{location\}/g, r.locationName || "this location"))}</label>
       ${f.type === "textarea" ? `<textarea data-edit-id="${f.id}">${esc(r[f.id] || "")}</textarea>` : `<input data-edit-id="${f.id}" value="${esc(r[f.id] || "")}">`}</div>`).join("") || `<p style="color:var(--ink-soft)">There are no free-text questions to edit.</p>`}
     <p style="font-size:12.5px;color:var(--ink-soft)">Edits are logged with your name and timestamp in the Audit Log.</p>
     <div class="modal-actions"><button class="btn btn-outline" id="eCancel">Cancel</button><button class="btn btn-gold" id="eSave">Save Changes</button></div>`);
@@ -749,7 +804,7 @@ async function viewLocations(main) {
       <div class="table-scroll"><table>
         <thead><tr><th>Name</th><th>Status</th><th>Order</th><th>Notify Emails</th><th>Actions</th></tr></thead>
         <tbody>${state.locations.map((l)=>`
-          <tr><td>${esc(l.name)}</td><td><span class="badge ${l.active?"green":"gray"}">${l.active?"Active":"Inactive"}</span></td><td>${l.displayOrder??"-"}</td>
+          <tr><td>${esc(l.name)}${l.nameAr ? `<div dir="rtl" style="font-size:12px;color:var(--ink-soft);text-align:left">${esc(l.nameAr)}</div>` : ""}</td><td><span class="badge ${l.active?"green":"gray"}">${l.active?"Active":"Inactive"}</span></td><td>${l.displayOrder??"-"}</td>
           <td>${(l.notifyEmails||[]).length ? `${l.notifyEmails.length} configured` : `<span class="badge gray">None set</span>`}</td>
           <td style="white-space:normal"><a href="#" data-edit="${l.id}">Edit</a> · <a href="#" data-toggle="${l.id}">${l.active?"Deactivate":"Activate"}</a> · <a href="#/qrcodes">QR</a> · <a href="#" data-del="${l.id}" style="color:var(--red)">Delete</a></td></tr>`).join("")||`<tr><td colspan="5">No locations yet.</td></tr>`}</tbody>
       </table></div>
@@ -770,7 +825,8 @@ function openLocationModal(loc) {
   const isEdit = !!loc;
   openModal(`
     <h3>${isEdit?"Edit":"Add"} Location</h3>
-    <div class="field"><label>Location Name</label><input id="lName" value="${esc(loc?.name||"")}"></div>
+    <div class="field"><label>Location Name — English</label><input id="lName" value="${esc(loc?.name||"")}"></div>
+    <div class="field"><label>Location Name — العربية (optional)</label><input id="lNameAr" dir="rtl" class="ar-input" value="${esc(loc?.nameAr||"")}" placeholder="Shown to guests who choose Arabic; if empty, the English name is shown">`+`</div>
     <div class="field"><label>Description</label><textarea id="lDesc">${esc(loc?.description||"")}</textarea></div>
     <div class="field"><label>Display Order</label><input type="number" id="lOrder" value="${loc?.displayOrder ?? state.locations.length+1}"></div>
     <div class="field">
@@ -786,7 +842,7 @@ function openLocationModal(loc) {
     if (!name) return toast("Location name is required.", "error");
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
     const notifyEmails = document.getElementById("lNotifyEmails").value.split(",").map((e)=>e.trim()).filter(Boolean);
-    const data = { name, description: document.getElementById("lDesc").value.trim(), displayOrder: Number(document.getElementById("lOrder").value)||0, notifyEmails, active: document.getElementById("lActive").checked, slug, updatedAt: Fs.serverTimestamp() };
+    const data = { name, nameAr: document.getElementById("lNameAr").value.trim(), description: document.getElementById("lDesc").value.trim(), displayOrder: Number(document.getElementById("lOrder").value)||0, notifyEmails, active: document.getElementById("lActive").checked, slug, updatedAt: Fs.serverTimestamp() };
     if (isEdit) await Fs.updateDoc(Fs.doc(db,"locations",loc.id), data);
     else { data.createdAt = Fs.serverTimestamp(); await Fs.addDoc(Fs.collection(db,"locations"), data); }
     toast("Location saved.", "success"); closeModal(); router();
@@ -1021,7 +1077,10 @@ async function viewSettings(main) {
   const s = snap.exists() ? snap.data() : {};
   main.innerHTML = `
     <div class="panel card"><h3>Organization Branding</h3>
-      <div class="field"><label>Organization Name</label><input id="sName" value="${esc(s.organizationName||"")}"></div>
+      <div class="bi-grid">
+        <div class="field"><label>Organization Name — English</label><input id="sName" value="${esc(s.organizationName||"")}"></div>
+        <div class="field"><label>Organization Name — العربية (optional)</label><input id="sNameAr" dir="rtl" class="ar-input" value="${esc(s.organizationNameAr||"")}"></div>
+      </div>
       <div class="field"><label>Address</label><input id="sAddress" value="${esc(s.address||"")}"></div>
       <div class="field"><label>Telephone</label><input id="sPhone" value="${esc(s.phone||"")}"></div>
       <div class="field"><label>Email</label><input id="sEmail" value="${esc(s.email||"")}"></div>
@@ -1058,11 +1117,17 @@ async function viewSettings(main) {
         thank-you message. <b>Location</b> and <b>Date of Visit</b> always stay at the top of the form. Changes apply to new
         submissions only — past feedback is never altered. Tip: put <code>{location}</code> in any question text and it becomes
         the guest's chosen location (e.g. "What did you like best about {location}?").
+        <br><br><b>English &amp; Arabic:</b> every piece of text has an English box and an Arabic (العربية) box. Guests choose their language on the form.
+        If an Arabic box is left empty, Arabic guests simply see the English text for that item. Guests' answers are always saved in English behind the scenes, so your reports, filters and exports aren't affected by language.
       </p>
 
       <h4 style="margin:18px 0 8px">Header (top of the form)</h4>
-      <div class="field"><label>Header Title</label><input id="qHeaderTitle"></div>
-      <div class="field"><label>Header Message</label><textarea id="qHeaderMessage" style="min-height:70px"></textarea></div>
+      <div class="bi-grid">
+        <div class="field"><label>Header Title — English</label><input id="qHeaderTitle"></div>
+        <div class="field"><label>Header Title — العربية</label><input id="qHeaderTitleAr" dir="rtl" class="ar-input"></div>
+        <div class="field"><label>Header Message — English</label><textarea id="qHeaderMessage" style="min-height:70px"></textarea></div>
+        <div class="field"><label>Header Message — العربية</label><textarea id="qHeaderMessageAr" dir="rtl" class="ar-input" style="min-height:70px"></textarea></div>
+      </div>
 
       <h4 style="margin:22px 0 8px">Questions</h4>
       <div id="qFieldsList"></div>
@@ -1073,13 +1138,18 @@ async function viewSettings(main) {
           <option value="choice">Choice (tap buttons)</option>
           <option value="rating">Rating (Poor / Average / Excellent)</option>
         </select>
-        <input id="qNewLabel" placeholder="Type the new question here" style="flex:1;min-width:200px">
+        <input id="qNewLabel" placeholder="New question (English)" style="flex:1;min-width:180px">
+        <input id="qNewLabelAr" dir="rtl" class="ar-input" placeholder="السؤال بالعربية (اختياري)" style="flex:1;min-width:180px">
         <button class="btn btn-outline btn-sm" id="qAddBtn" style="flex-shrink:0">+ Add Question</button>
       </div>
 
       <h4 style="margin:22px 0 8px">Footer (thank-you screen after submitting)</h4>
-      <div class="field"><label>Thank-You Title</label><input id="qFooterTitle"></div>
-      <div class="field" style="margin-bottom:0"><label>Thank-You Message</label><textarea id="qFooterMessage" style="min-height:70px"></textarea></div>
+      <div class="bi-grid">
+        <div class="field"><label>Thank-You Title — English</label><input id="qFooterTitle"></div>
+        <div class="field"><label>Thank-You Title — العربية</label><input id="qFooterTitleAr" dir="rtl" class="ar-input"></div>
+        <div class="field" style="margin-bottom:0"><label>Thank-You Message — English</label><textarea id="qFooterMessage" style="min-height:70px"></textarea></div>
+        <div class="field" style="margin-bottom:0"><label>Thank-You Message — العربية</label><textarea id="qFooterMessageAr" dir="rtl" class="ar-input" style="min-height:70px"></textarea></div>
+      </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
         <button class="btn btn-gold" id="qSaveBtn">Save Questionnaire</button>
@@ -1089,7 +1159,7 @@ async function viewSettings(main) {
     <button class="btn btn-gold" id="saveSettingsBtn">Save Branding &amp; Email Settings</button>`;
   document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
     await Fs.setDoc(Fs.doc(db,"settings","general"), {
-      organizationName: document.getElementById("sName").value.trim(), address: document.getElementById("sAddress").value.trim(),
+      organizationName: document.getElementById("sName").value.trim(), organizationNameAr: document.getElementById("sNameAr").value.trim(), address: document.getElementById("sAddress").value.trim(),
       phone: document.getElementById("sPhone").value.trim(), email: document.getElementById("sEmail").value.trim(),
       website: document.getElementById("sWebsite").value.trim(), footerText: document.getElementById("sFooter").value.trim(),
       emailjsServiceId: document.getElementById("sEjsService").value.trim(),
@@ -1103,10 +1173,13 @@ async function viewSettings(main) {
   // ---- Questionnaire Builder ----
   const TYPE_LABELS = { text: "Short text", textarea: "Long text", choice: "Choice", rating: "Rating" };
   let workingQ = cloneQ(state.questionnaire);
-  document.getElementById("qHeaderTitle").value = workingQ.headerTitle;
-  document.getElementById("qHeaderMessage").value = workingQ.headerMessage;
-  document.getElementById("qFooterTitle").value = workingQ.footerTitle;
-  document.getElementById("qFooterMessage").value = workingQ.footerMessage;
+  const fillTexts = () => {
+    document.getElementById("qHeaderTitle").value = en(workingQ.headerTitle); document.getElementById("qHeaderTitleAr").value = ar(workingQ.headerTitle);
+    document.getElementById("qHeaderMessage").value = en(workingQ.headerMessage); document.getElementById("qHeaderMessageAr").value = ar(workingQ.headerMessage);
+    document.getElementById("qFooterTitle").value = en(workingQ.footerTitle); document.getElementById("qFooterTitleAr").value = ar(workingQ.footerTitle);
+    document.getElementById("qFooterMessage").value = en(workingQ.footerMessage); document.getElementById("qFooterMessageAr").value = ar(workingQ.footerMessage);
+  };
+  fillTexts();
 
   function renderFieldsEditor() {
     const list = document.getElementById("qFieldsList");
@@ -1115,15 +1188,24 @@ async function viewSettings(main) {
       <div class="card" style="padding:14px;margin-bottom:10px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
           <span class="badge gray">${i + 1}. ${TYPE_LABELS[f.type] || f.type}</span>
-          <input class="qLabel" data-i="${i}" value="${esc(f.label)}" style="flex:1;min-width:200px" aria-label="Question text">
-          <label style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:13px;white-space:nowrap;margin:0">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:13px;white-space:nowrap;margin:0;margin-inline-start:auto">
             <input type="checkbox" class="qReq" data-i="${i}" style="width:auto" ${f.required ? "checked" : ""}> Required
           </label>
         </div>
-        ${f.type === "choice" ? `<input class="qOpts" data-i="${i}" value="${esc((f.options || []).join(", "))}" placeholder="Option 1, Option 2, Others" style="margin-bottom:4px" aria-label="Answer options">
-          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">Answer options, separated by commas. Include an option named <b>Others</b> to automatically show a "Please specify" box.</div>` : ""}
-        ${f.type === "text" || f.type === "textarea" ? `<input class="qPh" data-i="${i}" value="${esc(f.placeholder || "")}" placeholder="Hint text shown inside the empty answer box (optional)" style="margin-bottom:8px" aria-label="Hint text">` : ""}
-        ${f.type === "text" ? `<select class="qIn" data-i="${i}" style="margin-bottom:8px" aria-label="Answer type">
+        <div class="bi-grid">
+          <div><label>Question — English</label><input class="qLabel" data-i="${i}" value="${esc(en(f.label))}"></div>
+          <div><label>Question — العربية</label><input class="qLabelAr ar-input" data-i="${i}" dir="rtl" value="${esc(ar(f.label))}"></div>
+        </div>
+        ${f.type === "choice" ? `<div class="bi-grid" style="margin-top:8px">
+            <div><label>Answer options — English</label><input class="qOpts" data-i="${i}" value="${esc((f.options || []).map(en).join(", "))}" placeholder="Option 1, Option 2, Others"></div>
+            <div><label>Answer options — العربية (same order)</label><input class="qOptsAr ar-input" data-i="${i}" dir="rtl" value="${esc((f.options || []).map(ar).join("، "))}" placeholder="الخيار 1، الخيار 2، أخرى"></div>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);margin:6px 0 8px">Separate options with commas (the Arabic comma ، also works). Keep the Arabic in the <b>same order</b> as the English — the first Arabic option is the translation of the first English one, and so on. Include an option named <b>Others</b> to automatically show a "Please specify" box. Answers are always saved in English.</div>` : ""}
+        ${f.type === "text" || f.type === "textarea" ? `<div class="bi-grid" style="margin-top:8px">
+            <div><label>Hint text — English (optional)</label><input class="qPh" data-i="${i}" value="${esc(en(f.placeholder))}" placeholder="Shown inside the empty answer box"></div>
+            <div><label>Hint text — العربية (optional)</label><input class="qPhAr ar-input" data-i="${i}" dir="rtl" value="${esc(ar(f.placeholder))}"></div>
+          </div>` : ""}
+        ${f.type === "text" ? `<select class="qIn" data-i="${i}" style="margin:8px 0" aria-label="Answer type">
             <option value="text" ${(f.inputType || "text") === "text" ? "selected" : ""}>Plain text</option>
             <option value="email" ${f.inputType === "email" ? "selected" : ""}>Email address (validated)</option>
             <option value="tel" ${f.inputType === "tel" ? "selected" : ""}>Phone number</option>
@@ -1135,31 +1217,42 @@ async function viewSettings(main) {
         </div>
       </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px">No questions yet — add one below.</p>`;
 
-    list.querySelectorAll(".qLabel").forEach((el) => el.addEventListener("input", (e) => { workingQ.fields[+e.target.dataset.i].label = e.target.value; }));
+    const setPair = (i, key, side, value) => { const f = workingQ.fields[i]; f[key] = { ...pair(f[key]), [side]: value }; };
+    // Zips the English and Arabic option boxes together by position into [{en, ar}, ...]
+    const syncOptions = (i) => {
+      const split = (str) => str.split(/[,،]/).map((x) => x.trim()).filter(Boolean);
+      const enOpts = split(list.querySelector(`.qOpts[data-i="${i}"]`).value);
+      const arOpts = split(list.querySelector(`.qOptsAr[data-i="${i}"]`).value);
+      workingQ.fields[i].options = enOpts.map((e, k) => ({ en: e, ar: arOpts[k] || "" }));
+    };
+    list.querySelectorAll(".qLabel").forEach((el) => el.addEventListener("input", (e) => setPair(+e.target.dataset.i, "label", "en", e.target.value)));
+    list.querySelectorAll(".qLabelAr").forEach((el) => el.addEventListener("input", (e) => setPair(+e.target.dataset.i, "label", "ar", e.target.value)));
     list.querySelectorAll(".qReq").forEach((el) => el.addEventListener("change", (e) => { workingQ.fields[+e.target.dataset.i].required = e.target.checked; }));
-    list.querySelectorAll(".qOpts").forEach((el) => el.addEventListener("input", (e) => { workingQ.fields[+e.target.dataset.i].options = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); }));
-    list.querySelectorAll(".qPh").forEach((el) => el.addEventListener("input", (e) => { workingQ.fields[+e.target.dataset.i].placeholder = e.target.value; }));
+    list.querySelectorAll(".qOpts, .qOptsAr").forEach((el) => el.addEventListener("input", (e) => syncOptions(+e.target.dataset.i)));
+    list.querySelectorAll(".qPh").forEach((el) => el.addEventListener("input", (e) => setPair(+e.target.dataset.i, "placeholder", "en", e.target.value)));
+    list.querySelectorAll(".qPhAr").forEach((el) => el.addEventListener("input", (e) => setPair(+e.target.dataset.i, "placeholder", "ar", e.target.value)));
     list.querySelectorAll(".qIn").forEach((el) => el.addEventListener("change", (e) => { workingQ.fields[+e.target.dataset.i].inputType = e.target.value; }));
     list.querySelectorAll(".qUp").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.i; [workingQ.fields[i - 1], workingQ.fields[i]] = [workingQ.fields[i], workingQ.fields[i - 1]]; renderFieldsEditor(); }));
     list.querySelectorAll(".qDown").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.i; [workingQ.fields[i + 1], workingQ.fields[i]] = [workingQ.fields[i], workingQ.fields[i + 1]]; renderFieldsEditor(); }));
     list.querySelectorAll(".qDel").forEach((b) => b.addEventListener("click", () => {
       const f = workingQ.fields[+b.dataset.i];
-      if (!confirm(`Delete this question?\n\n"${f.label}"\n\nGuests will no longer be asked it. Answers already collected are kept.`)) return;
+      if (!confirm(`Delete this question?\n\n"${en(f.label)}"\n\nGuests will no longer be asked it. Answers already collected are kept.`)) return;
       workingQ.fields.splice(+b.dataset.i, 1); renderFieldsEditor();
     }));
   }
   renderFieldsEditor();
 
   document.getElementById("qAddBtn").addEventListener("click", () => {
-    const label = document.getElementById("qNewLabel").value.trim();
-    if (!label) return toast("Type the question first.", "error");
+    const labelEn = document.getElementById("qNewLabel").value.trim();
+    const labelAr = document.getElementById("qNewLabelAr").value.trim();
+    if (!labelEn) return toast("Type the question in English first (add the Arabic version too if you have it).", "error");
     const type = document.getElementById("qNewType").value;
-    const field = { id: toCamelId(label, workingQ.fields.map((f) => f.id)), type, label, required: type === "rating" };
-    if (type === "choice") field.options = ["Option 1", "Option 2"];
+    const field = { id: toCamelId(labelEn, workingQ.fields.map((f) => f.id)), type, label: { en: labelEn, ar: labelAr }, required: type === "rating" };
+    if (type === "choice") field.options = [{ en: "Option 1", ar: "" }, { en: "Option 2", ar: "" }];
     if (type === "text") field.inputType = "text";
-    if (type === "text" || type === "textarea") field.placeholder = "";
+    if (type === "text" || type === "textarea") field.placeholder = { en: "", ar: "" };
     workingQ.fields.push(field);
-    document.getElementById("qNewLabel").value = "";
+    document.getElementById("qNewLabel").value = ""; document.getElementById("qNewLabelAr").value = "";
     renderFieldsEditor();
     toast("Question added at the bottom — use ↑ to move it where you want.", "success");
   });
@@ -1168,21 +1261,21 @@ async function viewSettings(main) {
   document.getElementById("qResetBtn").addEventListener("click", () => {
     if (!confirm("Reset the whole questionnaire (header, questions, thank-you message) back to the original default? You still need to click Save afterwards.")) return;
     workingQ = cloneQ(DEFAULT_QUESTIONNAIRE);
-    document.getElementById("qHeaderTitle").value = workingQ.headerTitle;
-    document.getElementById("qHeaderMessage").value = workingQ.headerMessage;
-    document.getElementById("qFooterTitle").value = workingQ.footerTitle;
-    document.getElementById("qFooterMessage").value = workingQ.footerMessage;
+    fillTexts();
     renderFieldsEditor();
   });
 
   document.getElementById("qSaveBtn").addEventListener("click", async () => {
-    workingQ.headerTitle = document.getElementById("qHeaderTitle").value.trim();
-    workingQ.headerMessage = document.getElementById("qHeaderMessage").value.trim();
-    workingQ.footerTitle = document.getElementById("qFooterTitle").value.trim();
-    workingQ.footerMessage = document.getElementById("qFooterMessage").value.trim();
-    if (!workingQ.headerTitle) return toast("The header title can't be empty.", "error");
-    if (workingQ.fields.some((f) => !f.label.trim())) return toast("Every question needs some text.", "error");
+    const v = (id) => document.getElementById(id).value.trim();
+    workingQ.headerTitle = { en: v("qHeaderTitle"), ar: v("qHeaderTitleAr") };
+    workingQ.headerMessage = { en: v("qHeaderMessage"), ar: v("qHeaderMessageAr") };
+    workingQ.footerTitle = { en: v("qFooterTitle"), ar: v("qFooterTitleAr") };
+    workingQ.footerMessage = { en: v("qFooterMessage"), ar: v("qFooterMessageAr") };
+    if (!workingQ.headerTitle.en) return toast("The English header title can't be empty.", "error");
+    if (workingQ.fields.some((f) => !en(f.label).trim())) return toast("Every question needs its English text (the Arabic is optional).", "error");
     if (workingQ.fields.some((f) => f.type === "choice" && (f.options || []).length < 2)) return toast("Choice questions need at least 2 answer options.", "error");
+    const badOpts = workingQ.fields.find((f) => f.type === "choice" && (f.options || []).some((o) => ar(o)) && (f.options || []).some((o) => !ar(o)));
+    if (badOpts) toast(`Heads up: "${en(badOpts.label)}" has Arabic for only some of its options — the others will show in English to Arabic guests. Check the Arabic list has the same number of items as the English.`, "error");
     const btn = document.getElementById("qSaveBtn"); btn.disabled = true;
     try {
       await Fs.setDoc(Fs.doc(db, "settings", "questionnaire"), {

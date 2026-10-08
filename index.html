@@ -87,6 +87,14 @@ label{font-size:14px;font-weight:600;color:var(--ink-soft);display:block;margin-
 .unavailable p{font-size:14.5px;color:var(--ink-soft);line-height:1.55}
 fieldset{border:none;padding:0;margin:0}
 
+/* Language toggle + Arabic/RTL support */
+.lang-bar{display:flex;justify-content:center;gap:8px;padding:0;margin:0 0 18px}
+.lang-btn{border:1.5px solid rgba(255,255,255,.35);background:transparent;padding:6px 16px;border-radius:999px;
+  font-size:13px;font-weight:700;cursor:pointer;color:rgba(255,255,255,.85);touch-action:manipulation}
+.lang-btn.active{background:#fff;color:var(--ink);border-color:#fff}
+html[dir="rtl"] body{font-family:"Segoe UI","Tahoma","Geeza Pro","Noto Sans Arabic",var(--font-ui)}
+html[dir="rtl"] .required:after{content:" *"}
+
 /* Extra breathing room fix for very narrow phones (older SE, small Android) */
 @media (max-width:360px){
   .wrap{padding:0 12px}
@@ -117,12 +125,16 @@ fieldset{border:none;padding:0;margin:0}
 <div id="toastWrap" class="toast-wrap"></div>
 
 <div id="unavailableView" class="unavailable" style="display:none">
-  <h2>This feedback link is no longer available</h2>
-  <p>Please scan the current QR code at this location, or contact our team directly.</p>
+  <h2 data-i18n="unavailableTitle">This feedback link is no longer available</h2>
+  <p data-i18n="unavailableBody">Please scan the current QR code at this location, or contact our team directly.</p>
 </div>
 
 <div id="formWrapView">
   <div class="hero">
+    <div class="lang-bar">
+      <button type="button" class="lang-btn" data-setlang="en">English</button>
+      <button type="button" class="lang-btn" data-setlang="ar">العربية</button>
+    </div>
     <div class="org" id="orgNamePublic">GUEST FEEDBACK SYSTEM</div>
     <h1 id="pf-heroTitle">We appreciate your feedback</h1>
     <p id="pf-heroMessage">Please take a moment to share your comments by completing this short form.</p>
@@ -131,11 +143,11 @@ fieldset{border:none;padding:0;margin:0}
     <form id="feedbackForm" novalidate>
       <div class="step-card">
         <div class="field">
-          <label class="required" for="pf-location">Where did you visit?</label>
-          <select id="pf-location" required><option value="">Choose a location…</option></select>
-          <div id="pf-lockedNote" class="hint" style="display:none">📍 Location selected via QR code — thanks for scanning!</div>
+          <label class="required" for="pf-location" data-i18n="locationLabel">Where did you visit?</label>
+          <select id="pf-location" required><option value="" data-i18n="locationPlaceholder">Choose a location…</option></select>
+          <div id="pf-lockedNote" class="hint" style="display:none" data-i18n="lockedNote">📍 Location selected via QR code — thanks for scanning!</div>
         </div>
-        <div class="field" style="margin-bottom:0"><label class="required" for="pf-date">Date of Visit</label><input type="date" id="pf-date" required></div>
+        <div class="field" style="margin-bottom:0"><label class="required" for="pf-date" data-i18n="dateLabel">Date of Visit</label><input type="date" id="pf-date" required></div>
       </div>
 
       <!-- Everything below is fully admin-configurable — add, edit, delete,
@@ -143,14 +155,14 @@ fieldset{border:none;padding:0;margin:0}
            Builder. Rendered dynamically by the script below. -->
       <div id="dynamicFields"></div>
 
-      <div class="submit-bar"><button type="submit" class="btn btn-gold" id="pf-submitBtn">Submit Feedback</button></div>
+      <div class="submit-bar"><button type="submit" class="btn btn-gold" id="pf-submitBtn" data-i18n="submitBtn">Submit Feedback</button></div>
     </form>
 
     <div id="pf-thankyouView" class="thankyou" style="display:none">
       <div class="check">✓</div>
       <h2 id="pf-thankyouTitle">Thank you for your constructive feedback!</h2>
       <p style="color:var(--ink-soft)" id="pf-thankyouMessage">It genuinely helps us improve our service for you and every guest after you.</p>
-      <button class="btn btn-outline" id="pf-anotherBtn" style="margin-top:20px">Submit another feedback</button>
+      <button class="btn btn-outline" id="pf-anotherBtn" style="margin-top:20px" data-i18n="anotherBtn">Submit another feedback</button>
     </div>
   </div>
 </div>
@@ -168,7 +180,6 @@ const firebaseConfig = {
   appId: "1:640014161549:web:1845a04aa2e8350692b4c4"
 };
 
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import * as Fs from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -183,6 +194,81 @@ function toast(msg, type = "") {
 }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
+// ---------------------------------------------------------------------------
+// Language (English / Arabic). "bi()" reads whichever language is active from
+// a { en, ar } pair, falling back to English if the Arabic side is empty —
+// so admins can translate questions gradually without breaking anything.
+// It also accepts a plain string (from before bilingual support existed),
+// so nothing breaks for a questionnaire saved before this feature.
+// ---------------------------------------------------------------------------
+let lang = localStorage.getItem("gfs_lang") || "en";
+const UI = {
+  en: {
+    unavailableTitle: "This feedback link is no longer available",
+    unavailableBody: "Please scan the current QR code at this location, or contact our team directly.",
+    locationLabel: "Where did you visit?",
+    locationPlaceholder: "Choose a location…",
+    lockedNote: "📍 Location selected via QR code — thanks for scanning!",
+    dateLabel: "Date of Visit",
+    submitBtn: "Submit Feedback",
+    submitting: "Submitting…",
+    anotherBtn: "Submit another feedback",
+    pleaseSpecify: "Please specify",
+    ratingsTitle: "How was your experience?",
+    ratingsSub: "A quick tap on each — Poor, Average, or Excellent.",
+    ratingPoor: "Poor", ratingAverage: "Average", ratingExcellent: "Excellent",
+    cooldown: "You just submitted feedback. Please wait a moment before submitting again.",
+    chooseLocation: "Please choose where you visited.",
+    chooseDate: "Please choose the date of your visit.",
+    noFutureDate: "The date of your visit can't be in the future.",
+    pleaseRate: (l) => `Please rate "${l}".`,
+    pleaseAnswer: (l) => `Please answer "${l}".`,
+    pleaseSpecifyFor: (l) => `Please specify for "${l}".`,
+    pleaseFillIn: (l) => `Please fill in "${l}".`,
+    checkEmail: (l) => `Please double-check the email address for "${l}".`,
+    loadLocationsFail: "Could not load locations. Please refresh.",
+    submitFail: "We're sorry, but your feedback could not be submitted at this moment. Please try again.",
+    yourVisit: "your visit",
+  },
+  ar: {
+    unavailableTitle: "رابط الملاحظات هذا لم يعد متاحًا",
+    unavailableBody: "يرجى مسح رمز QR الحالي في هذا الموقع، أو التواصل مع فريقنا مباشرة.",
+    locationLabel: "أين كانت زيارتك؟",
+    locationPlaceholder: "اختر الموقع…",
+    lockedNote: "📍 تم اختيار الموقع عبر رمز QR — شكرًا لمسحك الرمز!",
+    dateLabel: "تاريخ الزيارة",
+    submitBtn: "إرسال الملاحظات",
+    submitting: "جارٍ الإرسال…",
+    anotherBtn: "إرسال ملاحظات أخرى",
+    pleaseSpecify: "يرجى التحديد",
+    ratingsTitle: "كيف كانت تجربتك؟",
+    ratingsSub: "اضغط بسرعة على كل تقييم — ضعيف، متوسط، أو ممتاز.",
+    ratingPoor: "ضعيف", ratingAverage: "متوسط", ratingExcellent: "ممتاز",
+    cooldown: "لقد أرسلت ملاحظاتك للتو. يرجى الانتظار قليلاً قبل الإرسال مرة أخرى.",
+    chooseLocation: "يرجى اختيار المكان الذي زرته.",
+    chooseDate: "يرجى اختيار تاريخ زيارتك.",
+    noFutureDate: "لا يمكن أن يكون تاريخ زيارتك في المستقبل.",
+    pleaseRate: (l) => `يرجى تقييم "${l}".`,
+    pleaseAnswer: (l) => `يرجى الإجابة على "${l}".`,
+    pleaseSpecifyFor: (l) => `يرجى التحديد لـ "${l}".`,
+    pleaseFillIn: (l) => `يرجى تعبئة "${l}".`,
+    checkEmail: (l) => `يرجى التحقق من البريد الإلكتروني الخاص بـ "${l}".`,
+    loadLocationsFail: "تعذر تحميل المواقع. يرجى تحديث الصفحة.",
+    submitFail: "نأسف، تعذر إرسال ملاحظاتك في الوقت الحالي. يرجى المحاولة مرة أخرى.",
+    yourVisit: "زيارتك",
+  },
+};
+function t(key, ...args) {
+  const v = (UI[lang] && UI[lang][key] !== undefined) ? UI[lang][key] : UI.en[key];
+  return typeof v === "function" ? v(...args) : v;
+}
+function bi(pair) {
+  if (pair && typeof pair === "object") return (lang === "ar" && pair.ar) ? pair.ar : (pair.en || "");
+  return pair || "";
+}
+function enLabel(pair) { return (pair && typeof pair === "object") ? (pair.en || "") : (pair || ""); } // for staff emails — always English
+function optValue(opt) { return (opt && typeof opt === "object") ? (opt.en || "") : (opt || ""); } // the stable stored value, language-independent
+
 // The questionnaire below (header text, every question, the thank-you
 // message) is the built-in starting point. The admin can fully customize
 // it in admin.html → Settings → Questionnaire Builder — add, edit, delete
@@ -193,55 +279,79 @@ function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp
 // swapped for the guest's chosen location name (e.g. "What did you like
 // best about {location}?").
 const DEFAULT_QUESTIONNAIRE = {
-  headerTitle: "We appreciate your feedback",
-  headerMessage: "Please take a moment to share your comments by completing this short form.",
-  footerTitle: "Thank you for your constructive feedback!",
-  footerMessage: "It genuinely helps us improve our service for you and every guest after you.",
+  headerTitle: { en: "We appreciate your feedback", ar: "نقدّر ملاحظاتكم" },
+  headerMessage: { en: "Please take a moment to share your comments by completing this short form.", ar: "يرجى تخصيص بضع دقائق لمشاركة ملاحظاتكم من خلال تعبئة هذا النموذج القصير." },
+  footerTitle: { en: "Thank you for your constructive feedback!", ar: "شكرًا لملاحظاتكم البنّاءة!" },
+  footerMessage: { en: "It genuinely helps us improve our service for you and every guest after you.", ar: "هذا يساعدنا فعليًا على تحسين خدماتنا لكم ولكل ضيف بعدكم." },
   fields: [
-    { id: "serverName", type: "text", label: "Server's Name", required: false, placeholder: "If you remember it — totally optional", inputType: "text" },
-    { id: "recommendation", type: "choice", label: "Would you recommend us to your friends and family?", required: true, options: ["Yes", "No"] },
-    { id: "heardAboutUs", type: "choice", label: "How did you hear about us?", required: true, options: ["Friends", "Newspaper & Magazines", "Social Media", "Others"] },
-    { id: "menuSelection", type: "rating", label: "Menu Selection", required: true },
-    { id: "foodQuality", type: "rating", label: "Food Quality", required: true },
-    { id: "service", type: "rating", label: "Service", required: true },
-    { id: "atmosphere", type: "rating", label: "Atmosphere / Ambiance", required: true },
-    { id: "valueForMoney", type: "rating", label: "Value for Money", required: true },
-    { id: "overallExperience", type: "rating", label: "Overall Experience", required: true },
-    { id: "likedBest", type: "textarea", label: "What did you like best about {location}?", required: false, placeholder: "Tell us what stood out…" },
-    { id: "improvementSuggestion", type: "textarea", label: "What could we do to make your experience even better?", required: false, placeholder: "We'd love to hear your suggestions…" },
-    { id: "guestName", type: "text", label: "Name", required: false, placeholder: "Your name", inputType: "text" },
-    { id: "contactNumber", type: "text", label: "Contact No.", required: false, placeholder: "Phone number", inputType: "tel" },
-    { id: "guestEmail", type: "text", label: "Email", required: false, placeholder: "you@example.com", inputType: "email" },
+    { id: "serverName", type: "text", required: false, inputType: "text",
+      label: { en: "Server's Name", ar: "اسم النادل" },
+      placeholder: { en: "If you remember it — totally optional", ar: "إذا كنت تتذكره — اختياري تمامًا" } },
+    { id: "recommendation", type: "choice", required: true,
+      label: { en: "Would you recommend us to your friends and family?", ar: "هل توصي بنا لأصدقائك وعائلتك؟" },
+      options: [{ en: "Yes", ar: "نعم" }, { en: "No", ar: "لا" }] },
+    { id: "heardAboutUs", type: "choice", required: true,
+      label: { en: "How did you hear about us?", ar: "كيف سمعت عنا؟" },
+      options: [
+        { en: "Friends", ar: "أصدقاء" },
+        { en: "Newspaper & Magazines", ar: "الصحف والمجلات" },
+        { en: "Social Media", ar: "وسائل التواصل الاجتماعي" },
+        { en: "Others", ar: "أخرى" },
+      ] },
+    { id: "menuSelection", type: "rating", required: true, label: { en: "Menu Selection", ar: "تشكيلة القائمة" } },
+    { id: "foodQuality", type: "rating", required: true, label: { en: "Food Quality", ar: "جودة الطعام" } },
+    { id: "service", type: "rating", required: true, label: { en: "Service", ar: "الخدمة" } },
+    { id: "atmosphere", type: "rating", required: true, label: { en: "Atmosphere / Ambiance", ar: "الأجواء" } },
+    { id: "valueForMoney", type: "rating", required: true, label: { en: "Value for Money", ar: "القيمة مقابل السعر" } },
+    { id: "overallExperience", type: "rating", required: true, label: { en: "Overall Experience", ar: "التجربة الإجمالية" } },
+    { id: "likedBest", type: "textarea", required: false,
+      label: { en: "What did you like best about {location}?", ar: "ما الذي أعجبك أكثر في {location}؟" },
+      placeholder: { en: "Tell us what stood out…", ar: "أخبرنا بما لفت انتباهك…" } },
+    { id: "improvementSuggestion", type: "textarea", required: false,
+      label: { en: "What could we do to make your experience even better?", ar: "ما الذي يمكننا فعله لتحسين تجربتك أكثر؟" },
+      placeholder: { en: "We'd love to hear your suggestions…", ar: "يسعدنا سماع اقتراحاتكم…" } },
+    { id: "guestName", type: "text", required: false, inputType: "text",
+      label: { en: "Name", ar: "الاسم" }, placeholder: { en: "Your name", ar: "اسمك" } },
+    { id: "contactNumber", type: "text", required: false, inputType: "tel",
+      label: { en: "Contact No.", ar: "رقم التواصل" }, placeholder: { en: "Phone number", ar: "رقم الهاتف" } },
+    { id: "guestEmail", type: "text", required: false, inputType: "email",
+      label: { en: "Email", ar: "البريد الإلكتروني" }, placeholder: { en: "you@example.com", ar: "you@example.com" } },
   ],
 };
 let questionnaire = DEFAULT_QUESTIONNAIRE;
-function currentLocationName() {
+let orgNamePair = { en: "GUEST FEEDBACK SYSTEM", ar: "" };
+
+function currentLocationPair() {
   const loc = locationsData.find((l) => l.id === locationSelect.value);
-  return loc ? loc.name : "your visit";
+  return loc ? { en: loc.name, ar: loc.nameAr || loc.name } : t("yourVisit");
 }
-function plainLabel(rawLabel) { return String(rawLabel).replace(/\{location\}/g, () => currentLocationName()); }
-function resolveLabel(rawLabel) { return esc(rawLabel).replace(/\{location\}/g, () => esc(currentLocationName())); }
+function plainLabel(rawLabel) { return bi(rawLabel).replace(/\{location\}/g, () => bi(currentLocationPair())); }
+function resolveLabel(rawLabel) { return esc(bi(rawLabel)).replace(/\{location\}/g, () => esc(bi(currentLocationPair()))); }
 
 const dynamicFields = document.getElementById("dynamicFields");
+const submitBtn = document.getElementById("pf-submitBtn");
+let submitting = false; // declared early — applyLanguage() (further below) reads this
+
+function applyStaticI18n() { document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); }); }
 
 function fieldCardHTML(f) {
   if (f.type === "choice") {
-    const hasOthers = (f.options || []).some((o) => o.trim().toLowerCase() === "others");
+    const hasOthers = (f.options || []).some((o) => optValue(o).trim().toLowerCase() === "others");
     return `<div class="step-card" data-field="${f.id}">
       <div class="field" style="margin-bottom:0">
-        <label class="${f.required ? "required" : ""}">${resolveLabel(f.label)}</label>
+        <label class="${f.required ? "required" : ""}" data-role="question-label">${resolveLabel(f.label)}</label>
         <div class="choice-row" data-choice-field="${f.id}">
-          ${(f.options || []).map((opt) => `<div class="choice" data-v="${esc(opt)}" style="flex:1 1 45%">${esc(opt)}</div>`).join("")}
+          ${(f.options || []).map((opt, i) => `<div class="choice" data-v="${esc(optValue(opt))}" data-i="${i}" style="flex:1 1 45%">${esc(bi(opt))}</div>`).join("")}
         </div>
-        ${hasOthers ? `<div class="field" data-other-wrap="${f.id}" style="display:none;margin:14px 0 0"><label>Please specify</label><input type="text" data-other-input="${f.id}" maxlength="150"></div>` : ""}
+        ${hasOthers ? `<div class="field" data-other-wrap="${f.id}" style="display:none;margin:14px 0 0"><label data-i18n="pleaseSpecify">Please specify</label><input type="text" data-other-input="${f.id}" maxlength="150"></div>` : ""}
       </div>
     </div>`;
   }
   if (f.type === "textarea") {
     return `<div class="step-card" data-field="${f.id}">
       <div class="field" style="margin-bottom:0">
-        <label class="${f.required ? "required" : ""}" for="f-${f.id}">${resolveLabel(f.label)}</label>
-        <textarea id="f-${f.id}" maxlength="2000" placeholder="${esc(f.placeholder||"")}"></textarea>
+        <label class="${f.required ? "required" : ""}" for="f-${f.id}" data-role="question-label">${resolveLabel(f.label)}</label>
+        <textarea id="f-${f.id}" maxlength="2000" placeholder="${esc(bi(f.placeholder))}"></textarea>
       </div>
     </div>`;
   }
@@ -249,8 +359,8 @@ function fieldCardHTML(f) {
     const inputMode = f.inputType === "email" ? ' inputmode="email"' : f.inputType === "tel" ? ' inputmode="tel"' : "";
     return `<div class="step-card" data-field="${f.id}">
       <div class="field" style="margin-bottom:0">
-        <label class="${f.required ? "required" : ""}" for="f-${f.id}">${resolveLabel(f.label)}</label>
-        <input type="${f.inputType || "text"}" id="f-${f.id}" maxlength="150" placeholder="${esc(f.placeholder||"")}"${inputMode}>
+        <label class="${f.required ? "required" : ""}" for="f-${f.id}" data-role="question-label">${resolveLabel(f.label)}</label>
+        <input type="${f.inputType || "text"}" id="f-${f.id}" maxlength="150" placeholder="${esc(bi(f.placeholder))}"${inputMode}>
       </div>
     </div>`;
   }
@@ -265,15 +375,15 @@ function renderDynamicFields(fields) {
       const group = [];
       while (i < fields.length && fields[i].type === "rating") { group.push(fields[i]); i++; }
       html += `<div class="step-card">
-        <div class="section-title" style="margin-bottom:4px">How was your experience?</div>
-        <p class="section-sub">A quick tap on each — Poor, Average, or Excellent.</p>
+        <div class="section-title" style="margin-bottom:4px" data-i18n="ratingsTitle">How was your experience?</div>
+        <p class="section-sub" data-i18n="ratingsSub">A quick tap on each — Poor, Average, or Excellent.</p>
         <fieldset>${group.map((f) => `
           <div class="rating-block" data-field="${f.id}">
             <div class="cat-name">${resolveLabel(f.label)}</div>
             <div class="rating-opts" data-cat="${f.id}">
-              <div class="rating-opt" data-v="Poor">Poor</div>
-              <div class="rating-opt" data-v="Average">Average</div>
-              <div class="rating-opt" data-v="Excellent">Excellent</div>
+              <div class="rating-opt" data-v="Poor" data-i18n="ratingPoor">Poor</div>
+              <div class="rating-opt" data-v="Average" data-i18n="ratingAverage">Average</div>
+              <div class="rating-opt" data-v="Excellent" data-i18n="ratingExcellent">Excellent</div>
             </div>
           </div>`).join("")}</fieldset>
       </div>`;
@@ -283,6 +393,7 @@ function renderDynamicFields(fields) {
     }
   }
   dynamicFields.innerHTML = html;
+  applyStaticI18n();
 }
 // NOTE: the first call to renderDynamicFields() happens further below, after
 // locationSelect/locationsData exist — labels can reference {location}.
@@ -318,11 +429,8 @@ async function loadQuestionnaire() {
         footerMessage: d.footerMessage || DEFAULT_QUESTIONNAIRE.footerMessage,
         fields: d.fields,
       };
-      document.getElementById("pf-heroTitle").textContent = questionnaire.headerTitle;
-      document.getElementById("pf-heroMessage").textContent = questionnaire.headerMessage;
-      document.getElementById("pf-thankyouTitle").textContent = questionnaire.footerTitle;
-      document.getElementById("pf-thankyouMessage").textContent = questionnaire.footerMessage;
       renderDynamicFields(questionnaire.fields);
+      applyLanguage();
     }
   } catch (e) { /* keep showing the default set if this fails */ }
 }
@@ -339,23 +447,23 @@ function collectAnswers() {
     if (f.type === "rating") {
       const group = dynamicFields.querySelector(`.rating-opts[data-cat="${f.id}"]`);
       const sel = group ? group.querySelector(".rating-opt.selected") : null;
-      if (f.required && !sel) return { error: `Please rate "${plainLabel(f.label)}".` };
+      if (f.required && !sel) return { error: t("pleaseRate", plainLabel(f.label)) };
       data.ratings[f.id] = sel ? sel.dataset.v : null;
     } else if (f.type === "choice") {
       const row = dynamicFields.querySelector(`.choice-row[data-choice-field="${f.id}"]`);
       const sel = row ? row.querySelector(".choice.selected") : null;
-      if (f.required && !sel) return { error: `Please answer "${plainLabel(f.label)}".` };
+      if (f.required && !sel) return { error: t("pleaseAnswer", plainLabel(f.label)) };
       data[f.id] = sel ? sel.dataset.v : "";
       const isOthers = sel && sel.dataset.v.trim().toLowerCase() === "others";
       const otherInput = dynamicFields.querySelector(`[data-other-input="${f.id}"]`);
       const otherVal = otherInput ? otherInput.value.trim() : "";
-      if (isOthers && !otherVal) return { error: `Please specify for "${plainLabel(f.label)}".` };
+      if (isOthers && !otherVal) return { error: t("pleaseSpecifyFor", plainLabel(f.label)) };
       data[f.id + "Other"] = isOthers ? otherVal : "";
     } else {
       const el = document.getElementById(`f-${f.id}`);
       const val = el ? el.value.trim() : "";
-      if (f.required && !val) return { error: `Please fill in "${plainLabel(f.label)}".` };
-      if (f.type === "text" && f.inputType === "email" && val && !validEmail(val)) return { error: `Please double-check the email address for "${plainLabel(f.label)}".` };
+      if (f.required && !val) return { error: t("pleaseFillIn", plainLabel(f.label)) };
+      if (f.type === "text" && f.inputType === "email" && val && !validEmail(val)) return { error: t("checkEmail", plainLabel(f.label)) };
       data[f.id] = val;
     }
   }
@@ -371,34 +479,75 @@ const qLocationSlug = params.get("location");
 const locationSelect = document.getElementById("pf-location");
 let locationsData = []; let lockedLocation = false;
 
-renderDynamicFields(questionnaire.fields); // first paint, doesn't wait on locations/questionnaire to finish loading
-
-// Re-paints just the {location} token in question labels without wiping
-// anything the guest has already typed/selected elsewhere in the form.
-function updateLocationTokens() {
+// Re-paints every piece of on-screen text for the active language — the
+// {location} token in question labels, location dropdown option names, the
+// hero/thank-you text, and every static label — without wiping anything the
+// guest has already typed/selected elsewhere in the form.
+function retranslateDynamicFields() {
   dynamicFields.querySelectorAll("[data-field]").forEach((card) => {
     const f = questionnaire.fields.find((x) => x.id === card.dataset.field);
-    if (!f || !f.label.includes("{location}")) return;
-    const labelEl = card.classList.contains("rating-block") ? card.querySelector(".cat-name") : card.querySelector("label");
-    if (labelEl) labelEl.innerHTML = resolveLabel(f.label);
+    if (!f) return;
+    if (card.classList.contains("rating-block")) {
+      const lbl = card.querySelector(".cat-name");
+      if (lbl) lbl.innerHTML = resolveLabel(f.label);
+      return;
+    }
+    const mainLabel = card.querySelector('[data-role="question-label"]');
+    if (mainLabel) mainLabel.innerHTML = resolveLabel(f.label);
+    if (f.type === "choice") {
+      card.querySelectorAll(".choice").forEach((btn) => {
+        const opt = (f.options || [])[+btn.dataset.i];
+        if (opt !== undefined) btn.textContent = bi(opt);
+      });
+    } else {
+      const input = card.querySelector("input, textarea");
+      if (input) input.placeholder = bi(f.placeholder);
+    }
   });
+  applyStaticI18n();
 }
-locationSelect.addEventListener("change", updateLocationTokens);
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("active", b.dataset.setlang === lang));
+  applyStaticI18n();
+  Array.from(locationSelect.options).forEach((opt) => {
+    if (!opt.value) return; // placeholder option already handled by data-i18n
+    const loc = locationsData.find((l) => l.id === opt.value);
+    if (loc) opt.textContent = bi({ en: loc.name, ar: loc.nameAr || loc.name });
+  });
+  document.getElementById("pf-heroTitle").textContent = bi(questionnaire.headerTitle);
+  document.getElementById("pf-heroMessage").textContent = bi(questionnaire.headerMessage);
+  document.getElementById("pf-thankyouTitle").textContent = bi(questionnaire.footerTitle);
+  document.getElementById("pf-thankyouMessage").textContent = bi(questionnaire.footerMessage);
+  document.getElementById("orgNamePublic").textContent = bi(orgNamePair);
+  retranslateDynamicFields();
+  if (!submitting) document.getElementById("pf-submitBtn").textContent = t("submitBtn");
+}
+document.querySelectorAll(".lang-btn").forEach((b) => b.addEventListener("click", () => {
+  lang = b.dataset.setlang;
+  localStorage.setItem("gfs_lang", lang);
+  applyLanguage();
+}));
+locationSelect.addEventListener("change", retranslateDynamicFields);
+
+renderDynamicFields(questionnaire.fields); // first paint, doesn't wait on locations/questionnaire to finish loading
+applyLanguage();
 
 async function loadLocations() {
   const q = Fs.query(Fs.collection(db, "locations"), Fs.where("active", "==", true));
   const snap = await Fs.getDocs(q);
   locationsData = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.displayOrder??0)-(b.displayOrder??0));
-  locationsData.forEach((loc) => { const opt = document.createElement("option"); opt.value = loc.id; opt.textContent = loc.name; locationSelect.appendChild(opt); });
+  locationsData.forEach((loc) => { const opt = document.createElement("option"); opt.value = loc.id; opt.textContent = bi({ en: loc.name, ar: loc.nameAr || loc.name }); locationSelect.appendChild(opt); });
   if (qLocationSlug) {
     const match = locationsData.find((l) => l.slug === qLocationSlug || l.id === qLocationSlug);
     if (!match) { document.getElementById("formWrapView").style.display = "none"; document.getElementById("unavailableView").style.display = "block"; return; }
     locationSelect.value = match.id; locationSelect.disabled = true; lockedLocation = true;
     document.getElementById("pf-lockedNote").style.display = "block";
   }
-  updateLocationTokens();
+  applyLanguage();
 }
-loadLocations().catch((err) => { console.error(err); toast("Could not load locations. Please refresh.", "error"); });
+loadLocations().catch((err) => { console.error(err); toast(t("loadLocationsFail"), "error"); });
 
 // ---------------------------------------------------------------------------
 // Email notification (EmailJS) — best-effort, browser-side. Configure the
@@ -438,9 +587,11 @@ async function sendNotificationEmails(loc, feedbackId, data) {
     guest_name: data.guestName || "-",
     guest_contact: data.contactNumber || "-",
     guest_email: data.guestEmail || "-",
-    // Always accurate regardless of how the questionnaire's been customized:
-    ratings_summary: ratingFields.map((f) => `${f.label}: ${data.ratings[f.id] || "-"}`).join(", "),
-    answers_summary: nonRatingFields.map((f) => `${f.label.replace(/\{location\}/g, loc.name)}: ${data[f.id] || "-"}`).join(", "),
+    // Always accurate regardless of how the questionnaire's been customized.
+    // Deliberately always in English here (regardless of which language the
+    // guest filled the form in) since these emails go to staff.
+    ratings_summary: ratingFields.map((f) => `${enLabel(f.label)}: ${data.ratings[f.id] || "-"}`).join(", "),
+    answers_summary: nonRatingFields.map((f) => `${enLabel(f.label).replace(/\{location\}/g, loc.name)}: ${data[f.id] || "-"}`).join(", "),
   };
   for (const to_email of loc.notifyEmails) {
     try { await emailjs.send(emailjsConfig.serviceId, emailjsConfig.templateId, { ...templateParams, to_email }); }
@@ -449,24 +600,22 @@ async function sendNotificationEmails(loc, feedbackId, data) {
 }
 
 const form = document.getElementById("feedbackForm");
-const submitBtn = document.getElementById("pf-submitBtn");
-let submitting = false;
 const COOLDOWN_MS = 60 * 1000; // best-effort duplicate-submission guard (no backend to rate-limit server-side)
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (submitting) return;
   const lastSubmit = Number(localStorage.getItem("gfs_lastSubmit") || 0);
-  if (Date.now() - lastSubmit < COOLDOWN_MS) { toast("You just submitted feedback. Please wait a moment before submitting again.", "error"); return; }
+  if (Date.now() - lastSubmit < COOLDOWN_MS) { toast(t("cooldown"), "error"); return; }
 
-  if (!locationSelect.value) return toast("Please choose where you visited.", "error");
-  if (!dateInput.value) return toast("Please choose the date of your visit.", "error");
-  if (dateInput.value > todayStr) return toast("The date of your visit can't be in the future.", "error");
+  if (!locationSelect.value) return toast(t("chooseLocation"), "error");
+  if (!dateInput.value) return toast(t("chooseDate"), "error");
+  if (dateInput.value > todayStr) return toast(t("noFutureDate"), "error");
   const result = collectAnswers();
   if (result.error) return toast(result.error, "error");
 
   const loc = locationsData.find((l) => l.id === locationSelect.value);
-  submitting = true; submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner"></span> Submitting…`;
+  submitting = true; submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner"></span> ${t("submitting")}`;
 
   const feedbackData = {
     locationId: locationSelect.value, locationName: loc ? loc.name : "",
@@ -498,8 +647,8 @@ form.addEventListener("submit", async (e) => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     console.error(err);
-    toast("We're sorry, but your feedback could not be submitted at this moment. Please try again.", "error");
-    submitting = false; submitBtn.disabled = false; submitBtn.textContent = "Submit Feedback";
+    toast(t("submitFail"), "error");
+    submitting = false; submitBtn.disabled = false; submitBtn.textContent = t("submitBtn");
   }
 });
 
@@ -507,15 +656,20 @@ document.getElementById("pf-anotherBtn").addEventListener("click", () => {
   renderDynamicFields(questionnaire.fields); // rebuilding the dynamic questions gives a clean blank slate
   if (!lockedLocation) locationSelect.value = "";
   dateInput.value = todayStr;
-  updateLocationTokens();
   document.getElementById("pf-thankyouView").style.display = "none";
   document.getElementById("feedbackForm").style.display = "block";
-  submitting = false; submitBtn.disabled = false; submitBtn.textContent = "Submit Feedback";
+  submitting = false; submitBtn.disabled = false;
+  applyLanguage();
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
 Fs.getDoc(Fs.doc(db, "settings", "general")).then((snap) => {
-  if (snap.exists() && snap.data().organizationName) document.getElementById("orgNamePublic").textContent = snap.data().organizationName;
+  if (!snap.exists()) return;
+  const s = snap.data();
+  if (s.organizationName) {
+    orgNamePair = { en: s.organizationName, ar: s.organizationNameAr || s.organizationName };
+    document.getElementById("orgNamePublic").textContent = bi(orgNamePair);
+  }
 }).catch(() => {});
 </script>
 </body>
