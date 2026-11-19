@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin — Guest Feedback System</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root{
   --ink:#1c1a17;--ink-soft:#5a544c;--paper:#fbfaf7;--card:#ffffff;--line:#e6e1d8;
@@ -229,11 +230,17 @@ service cloud.firestore {
 // ============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+
   authDomain: "guest-feedback-f27fb.firebaseapp.com",
+
   projectId: "guest-feedback-f27fb",
+
   storageBucket: "guest-feedback-f27fb.firebasestorage.app",
+
   messagingSenderId: "640014161549",
+
   appId: "1:640014161549:web:1845a04aa2e8350692b4c4"
+
 };
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -1109,6 +1116,19 @@ async function viewSettings(main) {
           <code>{{ratings_summary}}</code> (every rating question) and <code>{{answers_summary}}</code> (every other question) instead; they always reflect your current questions.
         </p>
       </details>
+
+      <div style="margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#faf9f6">
+        <h4 style="margin:0 0 6px">Check &amp; test your email setup</h4>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px">
+          Checks everything the guest form needs, then sends a real test email using the values currently typed in the three boxes above,
+          and shows you the exact reason if something is wrong.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="ejsTestTo" type="email" placeholder="Send the test to this email address" style="flex:1;min-width:220px">
+          <button class="btn btn-gold btn-sm" id="ejsTestBtn" style="flex-shrink:0">Check &amp; Send Test Email</button>
+        </div>
+        <div id="ejsResult" style="margin-top:12px;font-size:13.5px;line-height:1.6"></div>
+      </div>
     </div>
     <div class="panel card">
       <h3>Questionnaire Builder</h3>
@@ -1168,6 +1188,69 @@ async function viewSettings(main) {
       updatedAt: Fs.serverTimestamp(),
     }, { merge: true });
     toast("Settings saved.", "success");
+  });
+
+  // ---- Email check & test ----
+  document.getElementById("ejsTestTo").value = state.user.email || "";
+  function explainEmailJsError(err) {
+    const status = err && err.status, text = String((err && (err.text || err.message)) || err || "");
+    const low = text.toLowerCase();
+    let hint = "";
+    if (low.includes("public key") || low.includes("user id") || low.includes("user_id")) hint = "The <b>Public Key</b> is wrong. In EmailJS open <b>Account → General</b> and copy the Public Key again (not the Private Key).";
+    else if (low.includes("service id") || low.includes("service not found")) hint = "The <b>Service ID</b> is wrong. In EmailJS open <b>Email Services</b> and copy the ID that starts with <code>service_</code>.";
+    else if (low.includes("template") && (low.includes("not found") || low.includes("invalid") || status === 400)) hint = "The <b>Template ID</b> is wrong. In EmailJS open <b>Email Templates</b> and copy the ID that starts with <code>template_</code>.";
+    else if (low.includes("recipient") || low.includes("address is empty") || status === 422) hint = "The template has no recipient. In EmailJS open your template and set the <b>To Email</b> box to exactly <code>{{to_email}}</code>.";
+    else if (status === 412 || low.includes("gmail") || low.includes("invalid_grant") || low.includes("authentication")) hint = "EmailJS lost permission to send from your email account. In EmailJS open <b>Email Services</b>, click your service and reconnect / re-authorize it.";
+    else if (status === 403 || low.includes("domain") || low.includes("origin") || low.includes("non-browser")) hint = "EmailJS is blocking this website address. In EmailJS open <b>Account → Security</b> and either clear the allowed-domains list or add the address you host these files on.";
+    else if (status === 429 || low.includes("quota") || low.includes("limit")) hint = "EmailJS says you've hit a sending limit (the free plan has a monthly quota). Wait or upgrade the plan.";
+    return `<div style="margin-top:4px;padding:8px 10px;background:var(--red-tint);border-radius:8px;color:var(--red)">EmailJS replied: <b>${esc(status || "")} ${esc(text)}</b></div>${hint ? `<div style="margin-top:6px">👉 ${hint}</div>` : ""}`;
+  }
+  document.getElementById("ejsTestBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("ejsTestBtn"), out = document.getElementById("ejsResult");
+    const val = (id) => document.getElementById(id).value.trim();
+    const svc = val("sEjsService"), tpl = val("sEjsTemplate"), key = val("sEjsKey"), to = val("ejsTestTo");
+    const lines = [];
+    const good = (m) => lines.push(`<div style="color:var(--green)">✓ ${m}</div>`);
+    const bad = (m) => lines.push(`<div style="color:var(--red)">✗ ${m}</div>`);
+    btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Checking…`; out.innerHTML = "";
+    try {
+      // 1) boxes filled in
+      const missing = [!svc && "Service ID", !tpl && "Template ID", !key && "Public Key"].filter(Boolean);
+      if (missing.length) bad(`Please fill in: <b>${missing.join(", ")}</b>.`); else good("Service ID, Template ID and Public Key are all filled in.");
+      if (svc && !svc.startsWith("service_")) bad(`The Service ID normally starts with <code>service_</code> — yours is "${esc(svc)}". Check you copied the right one.`);
+      if (tpl && !tpl.startsWith("template_")) bad(`The Template ID normally starts with <code>template_</code> — yours is "${esc(tpl)}". Check you copied the right one.`);
+      // 2) saved? (the guest form only sees what is SAVED)
+      const saved = (await Fs.getDoc(Fs.doc(db, "settings", "general"))).data() || {};
+      if (svc && saved.emailjsServiceId === svc && saved.emailjsTemplateId === tpl && saved.emailjsPublicKey === key) good("These values are saved — the guest form is using them.");
+      else bad("These values are <b>not saved yet</b>. The guest form only uses saved values — click <b>Save Branding &amp; Email Settings</b> (the button at the very bottom of this page).");
+      // 3) locations
+      await loadLocations();
+      const active = state.locations.filter((l) => l.active);
+      const withMail = active.filter((l) => (l.notifyEmails || []).length), without = active.filter((l) => !(l.notifyEmails || []).length);
+      if (!active.length) bad("There are no active locations yet.");
+      else if (!withMail.length) bad("<b>No location has any Notification Emails</b>, so nothing is ever sent. Go to <b>Locations → Edit</b> and type the email address(es) in the <b>Notification Emails</b> box. (The separate “Email Destinations” page is only a notes list and does not send anything.)");
+      else good(`Notification emails are set for: ${withMail.map((l) => `<b>${esc(l.name)}</b>`).join(", ")}.`);
+      if (withMail.length && without.length) lines.push(`<div style="color:var(--amber)">⚠ No Notification Emails for: ${without.map((l) => esc(l.name)).join(", ")} — feedback for those locations won't send an email.</div>`);
+      // 4) real test
+      if (!window.emailjs) bad("The EmailJS script didn't load in this browser (an ad-blocker or firewall may be blocking <code>cdn.jsdelivr.net</code>).");
+      else if (!missing.length && !to) bad("Type an email address in the box above to send the test to.");
+      else if (!missing.length) {
+        try {
+          const res = await window.emailjs.send(svc, tpl, {
+            to_email: to, email: to, to, recipient: to, subject: "TEST – New Guest Feedback – Sample Location – FB-TEST-000000",
+            message: "This is a TEST email from your Guest Feedback system.\n\nIf you can read this, EmailJS is set up correctly.\n\nRATINGS\n• Service: Excellent\n• Food Quality: Average\n\nANSWERS\n• What did you like best?: The staff were wonderful.",
+            location_name: "Sample Location (TEST)", feedback_id: "FB-TEST-000000", date_of_visit: new Date().toISOString().slice(0, 10),
+            from_name: "Test Guest", name: "Test Guest", server_name: "Sample Server", recommendation: "Yes",
+            rating_menu: "Excellent", rating_food: "Average", rating_service: "Excellent", rating_atmosphere: "Excellent", rating_value: "Average", rating_overall: "Excellent",
+            liked_best: "The staff were wonderful.", improvement_suggestion: "-", guest_name: "Test Guest", guest_contact: "-", guest_email: "-",
+            ratings_summary: "Service: Excellent, Food Quality: Average", answers_summary: "What did you like best?: The staff were wonderful.",
+          }, { publicKey: key });
+          good(`EmailJS accepted the test email (status ${esc(res.status)}). Check the inbox of <b>${esc(to)}</b> — and its <b>Spam / Junk</b> folder — in the next minute.`);
+        } catch (err) { bad("EmailJS did not send the test email."); lines.push(explainEmailJsError(err)); }
+      }
+    } catch (err) { bad("Something unexpected went wrong: " + esc(err.message || err)); }
+    out.innerHTML = lines.join("");
+    btn.disabled = false; btn.innerHTML = "Check &amp; Send Test Email";
   });
 
   // ---- Questionnaire Builder ----

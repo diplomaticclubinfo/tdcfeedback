@@ -172,12 +172,18 @@ html[dir="rtl"] .required:after{content:" *"}
 // FIREBASE CONFIG — same project/config as your admin-dashboard.html file.
 // ============================================================================
 const firebaseConfig = {
-  apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+ apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+
   authDomain: "guest-feedback-f27fb.firebaseapp.com",
+
   projectId: "guest-feedback-f27fb",
+
   storageBucket: "guest-feedback-f27fb.firebasestorage.app",
+
   messagingSenderId: "640014161549",
+
   appId: "1:640014161549:web:1845a04aa2e8350692b4c4"
+
 };
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -556,46 +562,73 @@ loadLocations().catch((err) => { console.error(err); toast(t("loadLocationsFail"
 // If nothing is configured, this quietly does nothing (form still works).
 // ---------------------------------------------------------------------------
 let emailjsConfig = null;
-Fs.getDoc(Fs.doc(db, "settings", "general")).then((snap) => {
+const emailSettingsReady = Fs.getDoc(Fs.doc(db, "settings", "general")).then((snap) => {
   if (!snap.exists()) return;
   const s = snap.data();
   if (s.emailjsServiceId && s.emailjsTemplateId && s.emailjsPublicKey) {
-    emailjsConfig = { serviceId: s.emailjsServiceId, templateId: s.emailjsTemplateId, publicKey: s.emailjsPublicKey };
-    emailjs.init({ publicKey: emailjsConfig.publicKey });
+    emailjsConfig = { serviceId: s.emailjsServiceId.trim(), templateId: s.emailjsTemplateId.trim(), publicKey: s.emailjsPublicKey.trim() };
   }
-}).catch(() => {});
+}).catch((e) => console.warn("[Email] Could not read the email settings:", e));
 
 async function sendNotificationEmails(loc, feedbackId, data) {
-  if (!emailjsConfig || !loc || !Array.isArray(loc.notifyEmails) || loc.notifyEmails.length === 0) return;
+  await emailSettingsReady;
+  // Every reason an email might not go out is reported in the browser console (F12) instead of failing silently.
+  if (!emailjsConfig) return console.warn("[Email] Not sent: the EmailJS Service ID / Template ID / Public Key are not saved. Save them in admin.html → Settings.");
+  if (!window.emailjs) return console.warn("[Email] Not sent: the EmailJS script did not load (blocked by an ad-blocker, firewall or no internet?).");
+  if (!loc || !Array.isArray(loc.notifyEmails) || loc.notifyEmails.length === 0) return console.warn(`[Email] Not sent: no Notification Emails are set for "${loc && loc.name}". Add them in admin.html → Locations → Edit.`);
+
   const nonRatingFields = questionnaire.fields.filter((f) => f.type !== "rating");
   const ratingFields = questionnaire.fields.filter((f) => f.type === "rating");
+  const answerText = (f) => { let v = data[f.id] || "-"; if (data[f.id + "Other"]) v += " — " + data[f.id + "Other"]; return v; };
+  const cleanLabel = (f) => enLabel(f.label).replace(/\{location\}/g, loc.name);
+  const ratingsSummary = ratingFields.map((f) => `${cleanLabel(f)}: ${data.ratings[f.id] || "-"}`).join(", ");
+  const answersSummary = nonRatingFields.map((f) => `${cleanLabel(f)}: ${answerText(f)}`).join(", ");
+  // A ready-made, complete plain-text version: the simplest way to build a
+  // template is just  Subject: New Guest Feedback – {{location_name}} – {{feedback_id}}
+  // and Body: {{message}}
+  const message = [
+    `New guest feedback for ${loc.name}`, `Feedback ID: ${feedbackId}`, `Date of visit: ${data.dateOfVisit}`, "",
+    ...(ratingFields.length ? ["RATINGS", ...ratingFields.map((f) => `• ${cleanLabel(f)}: ${data.ratings[f.id] || "-"}`), ""] : []),
+    "ANSWERS", ...nonRatingFields.map((f) => `• ${cleanLabel(f)}: ${answerText(f)}`),
+  ].join("\n");
+
   const templateParams = {
     location_name: loc.name,
     feedback_id: feedbackId,
     date_of_visit: data.dateOfVisit,
+    message, subject: `New Guest Feedback – ${loc.name} – ${feedbackId}`,
+    from_name: data.guestName || "Guest", name: data.guestName || "Guest",
     // Fixed names, kept for backward compatibility with the original default questions:
     server_name: data.serverName || "-",
     recommendation: data.recommendation || "-",
-    rating_menu: data.ratings.menuSelection,
-    rating_food: data.ratings.foodQuality,
-    rating_service: data.ratings.service,
-    rating_atmosphere: data.ratings.atmosphere,
-    rating_value: data.ratings.valueForMoney,
-    rating_overall: data.ratings.overallExperience,
+    rating_menu: data.ratings.menuSelection || "-",
+    rating_food: data.ratings.foodQuality || "-",
+    rating_service: data.ratings.service || "-",
+    rating_atmosphere: data.ratings.atmosphere || "-",
+    rating_value: data.ratings.valueForMoney || "-",
+    rating_overall: data.ratings.overallExperience || "-",
     liked_best: data.likedBest || "-",
     improvement_suggestion: data.improvementSuggestion || "-",
     guest_name: data.guestName || "-",
     guest_contact: data.contactNumber || "-",
     guest_email: data.guestEmail || "-",
-    // Always accurate regardless of how the questionnaire's been customized.
-    // Deliberately always in English here (regardless of which language the
-    // guest filled the form in) since these emails go to staff.
-    ratings_summary: ratingFields.map((f) => `${enLabel(f.label)}: ${data.ratings[f.id] || "-"}`).join(", "),
-    answers_summary: nonRatingFields.map((f) => `${enLabel(f.label).replace(/\{location\}/g, loc.name)}: ${data[f.id] || "-"}`).join(", "),
+    // Always accurate regardless of how the questionnaire's been customized
+    // (always English — these emails go to staff).
+    ratings_summary: ratingsSummary,
+    answers_summary: answersSummary,
   };
+  if (data.guestEmail) templateParams.reply_to = data.guestEmail;
+
+  // One at a time: EmailJS limits how fast messages can be sent.
   for (const to_email of loc.notifyEmails) {
-    try { await emailjs.send(emailjsConfig.serviceId, emailjsConfig.templateId, { ...templateParams, to_email }); }
-    catch (err) { console.error("EmailJS send failed for", to_email, err); }
+    try {
+      // The recipient is sent under several common names so it works whichever one the template's "To Email" box uses.
+      await window.emailjs.send(emailjsConfig.serviceId, emailjsConfig.templateId,
+        { ...templateParams, to_email, email: to_email, to: to_email, recipient: to_email },
+        { publicKey: emailjsConfig.publicKey });
+    } catch (err) {
+      console.error(`[Email] EmailJS rejected the message for ${to_email}:`, err && err.status, err && (err.text || err.message || err));
+    }
   }
 }
 
@@ -639,7 +672,11 @@ form.addEventListener("submit", async (e) => {
       status: "new", createdBy: "guest", deleted: false,
     });
 
-    sendNotificationEmails(loc, feedbackId, feedbackData); // best-effort, doesn't block the thank-you screen
+    // Give the notification emails a fair chance to leave before showing the
+    // thank-you screen (guests often close the page right away), but never
+    // make a guest wait more than 8 seconds or fail their submission over it.
+    try { await Promise.race([sendNotificationEmails(loc, feedbackId, feedbackData), new Promise((r) => setTimeout(r, 8000))]); }
+    catch (e) { console.error("[Email]", e); }
 
     localStorage.setItem("gfs_lastSubmit", String(Date.now()));
     document.getElementById("feedbackForm").style.display = "none";
