@@ -172,7 +172,7 @@ html[dir="rtl"] .required:after{content:" *"}
 // FIREBASE CONFIG — same project/config as your admin-dashboard.html file.
 // ============================================================================
 const firebaseConfig = {
- apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+  apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
 
   authDomain: "guest-feedback-f27fb.firebaseapp.com",
 
@@ -558,7 +558,7 @@ loadLocations().catch((err) => { console.error(err); toast(t("loadLocationsFail"
 // ---------------------------------------------------------------------------
 // Email notification (EmailJS) — best-effort, browser-side. Configure the
 // Service ID / Template ID / Public Key in admin.html → Settings, and add
-// each location's notification emails in admin.html → Locations → Edit.
+// recipients on admin.html → Email Destinations.
 // If nothing is configured, this quietly does nothing (form still works).
 // ---------------------------------------------------------------------------
 let emailjsConfig = null;

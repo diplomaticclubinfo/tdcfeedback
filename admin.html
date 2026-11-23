@@ -229,7 +229,7 @@ service cloud.firestore {
 // FIREBASE CONFIG — same project/config as your feedback.html file.
 // ============================================================================
 const firebaseConfig = {
-  apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+   apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
 
   authDomain: "guest-feedback-f27fb.firebaseapp.com",
 
@@ -503,6 +503,36 @@ async function loadLocations() {
   const snap = await Fs.getDocs(Fs.collection(db, "locations"));
   state.locations = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.displayOrder??0)-(b.displayOrder??0));
   return state.locations;
+}
+// ---------------------------------------------------------------------------
+// Notification routing. The guest form (which has no login) can only read the
+// location records, not the private Email Destinations list — so whenever the
+// destinations change, each location's own "notifyEmails" list is rebuilt as:
+//   (emails typed directly on the location, kept in "extraEmails")
+//   + (every ENABLED Email Destination assigned to that location).
+// ---------------------------------------------------------------------------
+function mergeEmails(...lists) {
+  const seen = new Set(), out = [];
+  lists.flat().forEach((e) => { const t = String(e || "").trim(), k = t.toLowerCase(); if (t && !seen.has(k)) { seen.add(k); out.push(t); } });
+  return out;
+}
+async function syncNotifyEmails() {
+  const recips = (await Fs.getDocs(Fs.collection(db, "emailRecipients"))).docs.map((d) => ({ id: d.id, ...d.data() }));
+  await loadLocations();
+  let changed = 0;
+  for (const l of state.locations) {
+    // Locations saved before this feature only ever had hand-typed addresses, so those become the "extra" list.
+    const extra = Array.isArray(l.extraEmails) ? l.extraEmails : (l.notifyEmails || []);
+    const merged = mergeEmails(extra, recips.filter((r) => r.active !== false && (r.locationIds || []).includes(l.id)).map((r) => r.email));
+    const cur = l.notifyEmails || [];
+    const same = merged.length === cur.length && merged.every((e, i) => e === cur[i]);
+    if (!same || !Array.isArray(l.extraEmails)) {
+      await Fs.updateDoc(Fs.doc(db, "locations", l.id), { notifyEmails: merged, extraEmails: extra });
+      changed++;
+    }
+  }
+  if (changed) await loadLocations();
+  return changed;
 }
 function visibleLocations() { return state.role === "admin" ? state.locations : state.locations.filter((l) => state.assignedLocationIds.includes(l.id)); }
 function locName(id) { const l = state.locations.find((x) => x.id === id); return l ? l.name : id; }
@@ -837,9 +867,9 @@ function openLocationModal(loc) {
     <div class="field"><label>Description</label><textarea id="lDesc">${esc(loc?.description||"")}</textarea></div>
     <div class="field"><label>Display Order</label><input type="number" id="lOrder" value="${loc?.displayOrder ?? state.locations.length+1}"></div>
     <div class="field">
-      <label>Notification Emails</label>
-      <input id="lNotifyEmails" value="${esc((loc?.notifyEmails||[]).join(", "))}" placeholder="manager@example.com, supervisor@example.com">
-      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">Comma-separated. These addresses get an email (via EmailJS — set up in Settings) every time a guest submits feedback for this location. They are visible in this page's source/network traffic while this location is active — see the note on the Email Destinations page.</div>
+      <label>Extra Notification Emails (optional)</label>
+      <input id="lNotifyEmails" value="${esc((Array.isArray(loc?.extraEmails) ? loc.extraEmails : (loc?.notifyEmails||[])).join(", "))}" placeholder="manager@example.com, supervisor@example.com">
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px">Comma-separated. Everyone you assign to this location on the <b>Email Destinations</b> page already receives the feedback — you only need this box for addresses you want to type in directly. Note: these addresses are stored where the guest page can read them (that's how it knows where to send), so technically-minded visitors could find them.</div>
     </div>
     <div class="field"><label><input type="checkbox" id="lActive" style="width:auto;display:inline-block;margin-right:8px" ${loc?.active!==false?"checked":""}> Active</label></div>
     <div class="modal-actions"><button class="btn btn-outline" id="lCancel">Cancel</button><button class="btn btn-gold" id="lSave">Save</button></div>`);
@@ -848,8 +878,14 @@ function openLocationModal(loc) {
     const name = document.getElementById("lName").value.trim();
     if (!name) return toast("Location name is required.", "error");
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
-    const notifyEmails = document.getElementById("lNotifyEmails").value.split(",").map((e)=>e.trim()).filter(Boolean);
-    const data = { name, nameAr: document.getElementById("lNameAr").value.trim(), description: document.getElementById("lDesc").value.trim(), displayOrder: Number(document.getElementById("lOrder").value)||0, notifyEmails, active: document.getElementById("lActive").checked, slug, updatedAt: Fs.serverTimestamp() };
+    const extraEmails = mergeEmails(document.getElementById("lNotifyEmails").value.split(/[,;\s]+/));
+    let fromDestinations = [];
+    if (isEdit) {
+      const recips = (await Fs.getDocs(Fs.collection(db, "emailRecipients"))).docs.map((d) => d.data());
+      fromDestinations = recips.filter((r) => r.active !== false && (r.locationIds || []).includes(loc.id)).map((r) => r.email);
+    }
+    const notifyEmails = mergeEmails(extraEmails, fromDestinations);
+    const data = { name, nameAr: document.getElementById("lNameAr").value.trim(), description: document.getElementById("lDesc").value.trim(), displayOrder: Number(document.getElementById("lOrder").value)||0, notifyEmails, extraEmails, active: document.getElementById("lActive").checked, slug, updatedAt: Fs.serverTimestamp() };
     if (isEdit) await Fs.updateDoc(Fs.doc(db,"locations",loc.id), data);
     else { data.createdAt = Fs.serverTimestamp(); await Fs.addDoc(Fs.collection(db,"locations"), data); }
     toast("Location saved.", "success"); closeModal(); router();
@@ -928,6 +964,8 @@ function openUserModal(user, allUsers) {
 
 // ---- Email Destinations ------------------------------------------------------
 async function viewEmails(main) {
+  await loadLocations();
+  try { await syncNotifyEmails(); } catch (e) { console.error("sync failed", e); toast("Could not update the recipient lists: " + (e.message || e), "error"); }
   const snap = await Fs.getDocs(Fs.collection(db, "emailRecipients"));
   const recips = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   main.innerHTML = `
@@ -935,18 +973,26 @@ async function viewEmails(main) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <h3 style="margin:0">Email Destinations</h3><button class="btn btn-gold btn-sm" id="addEmailBtn">+ Add Email</button>
       </div>
-      <p style="color:var(--amber);font-size:12.5px;margin-top:-6px">This list is for your own records only. Actual notification emails are sent per-location — set each location's addresses under <b>Locations → Edit → Notification Emails</b>, and configure the sender under <b>Settings → Email Notifications</b>.</p>
+      <p style="color:var(--ink-soft);font-size:13px;margin-top:-6px">Everyone listed here who is <b>Enabled</b> automatically receives an email with the guest's feedback whenever a guest submits the form for one of their assigned locations. Emails are sent through EmailJS — set that up (and test it) under <b>Settings → Email Notifications</b>.</p>
       <div class="table-scroll"><table>
         <thead><tr><th>Recipient Name</th><th>Email</th><th>Assigned Locations</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>${recips.map((r)=>`
-          <tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${(r.locationIds||[]).map(locName).join(", ")||"-"}</td>
+          <tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${(r.locationIds||[]).map(locName).join(", ")||`<span class="badge amber">No location assigned — will not receive anything</span>`}</td>
           <td><span class="badge ${r.active?"green":"gray"}">${r.active?"Enabled":"Disabled"}</span></td>
           <td><a href="#" data-edit="${r.id}">Edit</a> · <a href="#" data-del="${r.id}" style="color:var(--red)">Delete</a></td></tr>`).join("")||`<tr><td colspan="5">No email destinations configured yet.</td></tr>`}</tbody>
+      </table></div>
+    </div>
+    <div class="panel card">
+      <h3>Who receives feedback for each location</h3>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin-top:-6px">This is exactly what the guest form uses right now.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Location</th><th>Emails are sent to</th></tr></thead>
+        <tbody>${state.locations.map((l)=>`<tr><td>${esc(l.name)}${l.active ? "" : ` <span class="badge gray">Inactive</span>`}</td><td style="white-space:normal">${(l.notifyEmails||[]).length ? (l.notifyEmails||[]).map(esc).join(", ") : `<span style="color:var(--ink-soft)">Nobody yet</span>`}</td></tr>`).join("")||`<tr><td colspan="2">No locations yet.</td></tr>`}</tbody>
       </table></div>
     </div>`;
   document.getElementById("addEmailBtn").addEventListener("click", () => openEmailModal(null));
   main.querySelectorAll("[data-edit]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openEmailModal(recips.find((r)=>r.id===a.dataset.edit)); }));
-  main.querySelectorAll("[data-del]").forEach((a) => a.addEventListener("click", async (e) => { e.preventDefault(); if (!confirm("Delete this email destination?")) return; await Fs.deleteDoc(Fs.doc(db,"emailRecipients",a.dataset.del)); toast("Deleted.", "success"); router(); }));
+  main.querySelectorAll("[data-del]").forEach((a) => a.addEventListener("click", async (e) => { e.preventDefault(); if (!confirm("Delete this email destination?")) return; await Fs.deleteDoc(Fs.doc(db,"emailRecipients",a.dataset.del)); await syncNotifyEmails(); toast("Deleted.", "success"); router(); }));
 }
 function openEmailModal(recip) {
   const isEdit = !!recip;
@@ -965,7 +1011,8 @@ function openEmailModal(recip) {
     const data = { name: document.getElementById("erName").value.trim(), email, locationIds, active: document.getElementById("erActive").checked, updatedAt: Fs.serverTimestamp() };
     if (isEdit) await Fs.updateDoc(Fs.doc(db,"emailRecipients",recip.id), data);
     else { data.createdAt = Fs.serverTimestamp(); await Fs.addDoc(Fs.collection(db,"emailRecipients"), data); }
-    toast("Saved.", "success"); closeModal(); router();
+    try { await syncNotifyEmails(); } catch (e) { return toast("Saved, but the recipient lists could not be updated: " + (e.message || e), "error"); }
+    toast("Saved. Feedback emails for the assigned locations will now go to this address.", "success"); closeModal(); router();
   });
 }
 
@@ -1100,7 +1147,7 @@ async function viewSettings(main) {
         This system has no private server, so it uses <a href="https://www.emailjs.com" target="_blank" rel="noopener">EmailJS</a>
         (free tier available) to send feedback notifications straight from the guest's browser. Create a free EmailJS account,
         add an Email Service (e.g. connect Gmail), create a Template with the variables listed below, then paste the three IDs here.
-        Then add each location's notification emails under <b>Locations → Edit</b>.
+        Then add the people who should receive the feedback on the <b>Email Destinations</b> page.
       </p>
       <div class="field"><label>EmailJS Service ID</label><input id="sEjsService" value="${esc(s.emailjsServiceId||"")}" placeholder="e.g. service_abc1234"></div>
       <div class="field"><label>EmailJS Template ID</label><input id="sEjsTemplate" value="${esc(s.emailjsTemplateId||"")}" placeholder="e.g. template_xyz789"></div>
@@ -1224,13 +1271,14 @@ async function viewSettings(main) {
       if (svc && saved.emailjsServiceId === svc && saved.emailjsTemplateId === tpl && saved.emailjsPublicKey === key) good("These values are saved — the guest form is using them.");
       else bad("These values are <b>not saved yet</b>. The guest form only uses saved values — click <b>Save Branding &amp; Email Settings</b> (the button at the very bottom of this page).");
       // 3) locations
-      await loadLocations();
+      const synced = await syncNotifyEmails();
+      if (synced) good(`Updated the recipient list of ${synced} location(s) from your Email Destinations page.`);
       const active = state.locations.filter((l) => l.active);
       const withMail = active.filter((l) => (l.notifyEmails || []).length), without = active.filter((l) => !(l.notifyEmails || []).length);
       if (!active.length) bad("There are no active locations yet.");
-      else if (!withMail.length) bad("<b>No location has any Notification Emails</b>, so nothing is ever sent. Go to <b>Locations → Edit</b> and type the email address(es) in the <b>Notification Emails</b> box. (The separate “Email Destinations” page is only a notes list and does not send anything.)");
-      else good(`Notification emails are set for: ${withMail.map((l) => `<b>${esc(l.name)}</b>`).join(", ")}.`);
-      if (withMail.length && without.length) lines.push(`<div style="color:var(--amber)">⚠ No Notification Emails for: ${without.map((l) => esc(l.name)).join(", ")} — feedback for those locations won't send an email.</div>`);
+      else if (!withMail.length) bad("<b>No location has anybody to send to</b>, so nothing is ever sent. Open the <b>Email Destinations</b> page, add each person, tick the locations they should hear about, and keep them <b>Enabled</b>.");
+      else good(`Emails will be sent for: ${withMail.map((l) => `<b>${esc(l.name)}</b> → ${esc(l.notifyEmails.join(", "))}`).join("; ")}.`);
+      if (withMail.length && without.length) lines.push(`<div style="color:var(--amber)">⚠ Nobody is assigned to: ${without.map((l) => esc(l.name)).join(", ")} — feedback for those locations won't send an email.</div>`);
       // 4) real test
       if (!window.emailjs) bad("The EmailJS script didn't load in this browser (an ad-blocker or firewall may be blocking <code>cdn.jsdelivr.net</code>).");
       else if (!missing.length && !to) bad("Type an email address in the box above to send the test to.");
