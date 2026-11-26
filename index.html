@@ -171,6 +171,7 @@ html[dir="rtl"] .required:after{content:" *"}
 // ============================================================================
 // FIREBASE CONFIG — same project/config as your admin-dashboard.html file.
 // ============================================================================
+const GFS_FORM_VERSION = 3; // the admin's "Check & Send Test Email" reads this to tell whether the live guest form is up to date
 const firebaseConfig = {
   apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
 
@@ -579,6 +580,7 @@ async function sendNotificationEmails(loc, feedbackId, data) {
 
   const nonRatingFields = questionnaire.fields.filter((f) => f.type !== "rating");
   const ratingFields = questionnaire.fields.filter((f) => f.type === "rating");
+  const dmy = (iso) => /^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join("-") : (iso || ""); // 2026-09-23 -> 23-09-2026
   const answerText = (f) => { let v = data[f.id] || "-"; if (data[f.id + "Other"]) v += " — " + data[f.id + "Other"]; return v; };
   const cleanLabel = (f) => enLabel(f.label).replace(/\{location\}/g, loc.name);
   const ratingsSummary = ratingFields.map((f) => `${cleanLabel(f)}: ${data.ratings[f.id] || "-"}`).join(", ");
@@ -587,7 +589,7 @@ async function sendNotificationEmails(loc, feedbackId, data) {
   // template is just  Subject: New Guest Feedback – {{location_name}} – {{feedback_id}}
   // and Body: {{message}}
   const message = [
-    `New guest feedback for ${loc.name}`, `Feedback ID: ${feedbackId}`, `Date of visit: ${data.dateOfVisit}`, "",
+    `New guest feedback for ${loc.name}`, `Feedback ID: ${feedbackId}`, `Date of visit: ${dmy(data.dateOfVisit)}`, "",
     ...(ratingFields.length ? ["RATINGS", ...ratingFields.map((f) => `• ${cleanLabel(f)}: ${data.ratings[f.id] || "-"}`), ""] : []),
     "ANSWERS", ...nonRatingFields.map((f) => `• ${cleanLabel(f)}: ${answerText(f)}`),
   ].join("\n");
@@ -595,7 +597,7 @@ async function sendNotificationEmails(loc, feedbackId, data) {
   const templateParams = {
     location_name: loc.name,
     feedback_id: feedbackId,
-    date_of_visit: data.dateOfVisit,
+    date_of_visit: dmy(data.dateOfVisit),
     message, subject: `New Guest Feedback – ${loc.name} – ${feedbackId}`,
     from_name: data.guestName || "Guest", name: data.guestName || "Guest",
     // Fixed names, kept for backward compatibility with the original default questions:
@@ -617,6 +619,11 @@ async function sendNotificationEmails(loc, feedbackId, data) {
     ratings_summary: ratingsSummary,
     answers_summary: answersSummary,
   };
+  // "How did you hear about us?" — plus a name for EVERY question: {{answer_<question id>}}
+  // (the exact name is shown next to each question in admin.html → Settings → Questionnaire Builder).
+  const heardField = questionnaire.fields.find((f) => f.id === "heardAboutUs") || questionnaire.fields.find((f) => /hear\w*\s+about/i.test(enLabel(f.label)));
+  templateParams.heard_about_us = heardField ? answerText(heardField) : "-";
+  questionnaire.fields.forEach((f) => { templateParams["answer_" + f.id] = f.type === "rating" ? (data.ratings[f.id] || "-") : answerText(f); });
   if (data.guestEmail) templateParams.reply_to = data.guestEmail;
 
   // One at a time: EmailJS limits how fast messages can be sent.

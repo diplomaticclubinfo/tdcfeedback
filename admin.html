@@ -229,7 +229,7 @@ service cloud.firestore {
 // FIREBASE CONFIG — same project/config as your feedback.html file.
 // ============================================================================
 const firebaseConfig = {
-   apiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
+  aapiKey: "AIzaSyCqk1GufuU0smv4U_EHYaXQcl0eXzGhE5Y",
 
   authDomain: "guest-feedback-f27fb.firebaseapp.com",
 
@@ -268,16 +268,16 @@ function toast(msg, type = "") {
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 function fmtDate(d) {
   if (!d) return "-";
-  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) { const [y,m,da]=d.split("-"); return `${da}/${m}/${y}`; }
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) { const [y,m,da]=d.split("-"); return `${da}-${m}-${y}`; }
   const dt = d.toDate ? d.toDate() : new Date(d);
   if (isNaN(dt)) return String(d);
-  return dt.toLocaleDateString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric", timeZone:"Asia/Qatar" });
+  return dt.toLocaleDateString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric", timeZone:"Asia/Qatar" }).replace(/\//g, "-");
 }
 function fmtDateTime(d) {
   if (!d) return "-";
   const dt = d.toDate ? d.toDate() : new Date(d);
   if (isNaN(dt)) return "-";
-  return dt.toLocaleString("en-GB", { timeZone:"Asia/Qatar", day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  return dt.toLocaleString("en-GB", { timeZone:"Asia/Qatar", day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }).replace(/(\d{2})\/(\d{2})\/(\d{4})/, "$1-$2-$3");
 }
 // For sorting query results by submittedAt in the browser instead of asking
 // Firestore to (Firestore needs a composite index to combine a where()
@@ -747,7 +747,7 @@ async function viewFeedbackList(main) {
       if (f.type === "choice" && r[f.id + "Other"]) v += " — " + r[f.id + "Other"];
       return v;
     };
-    const lines = [header.map(csvEscape).join(",")].concat(rows.map((r)=>[r.feedbackId,r.dateOfVisit,r.locationName, ...qFields.map((f)=>cell(r,f)), fmtDateTime(r.submittedAt)].map(csvEscape).join(",")));
+    const lines = [header.map(csvEscape).join(",")].concat(rows.map((r)=>[r.feedbackId,fmtDate(r.dateOfVisit),r.locationName, ...qFields.map((f)=>cell(r,f)), fmtDateTime(r.submittedAt)].map(csvEscape).join(",")));
     downloadFile(`feedback-export-${Date.now()}.csv`, "\uFEFF"+lines.join("\n"), "text/csv;charset=utf-8");
   });
   await runQuery();
@@ -1158,10 +1158,20 @@ async function viewSettings(main) {
           In your EmailJS template, set "To Email" to <code>{{to_email}}</code>, and use these in the subject/body:<br>
           <code>{{location_name}} {{feedback_id}} {{date_of_visit}} {{server_name}} {{recommendation}}
           {{rating_menu}} {{rating_food}} {{rating_service}} {{rating_atmosphere}} {{rating_value}} {{rating_overall}}
-          {{liked_best}} {{improvement_suggestion}} {{guest_name}} {{guest_contact}} {{guest_email}}</code><br><br>
+          {{liked_best}} {{improvement_suggestion}} {{guest_name}} {{guest_contact}} {{guest_email}} {{heard_about_us}}</code><br>
+          Every question also has its own name, <code>{{answer_…}}</code> — it is shown beside each question in the Questionnaire Builder below.<br><br>
           If you've customized the questionnaire below, the named ones above may not all apply — use
           <code>{{ratings_summary}}</code> (every rating question) and <code>{{answers_summary}}</code> (every other question) instead; they always reflect your current questions.
         </p>
+      </details>
+
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--ink-soft)">The email name of each of your questions</summary>
+        <div class="table-scroll" style="margin-top:8px"><table>
+          <thead><tr><th>Question</th><th>Type this in the template</th></tr></thead>
+          <tbody>${state.questionnaire.fields.map((f) => `<tr><td style="white-space:normal">${esc(en(f.label).replace(/\{location\}/g, "[location]"))}</td><td><code>{{answer_${esc(f.id)}}}</code></td></tr>`).join("")}</tbody>
+        </table></div>
+        <p style="font-size:12px;color:var(--ink-soft)">Copy the name exactly — capital letters matter. For "How did you hear about us?" you can also use <code>{{heard_about_us}}</code>.</p>
       </details>
 
       <div style="margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#faf9f6">
@@ -1171,6 +1181,7 @@ async function viewSettings(main) {
           and shows you the exact reason if something is wrong.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="ejsFormUrl" placeholder="Web address of your guest form, e.g. https://yoursite.com/feedback.html" style="flex:1 1 100%" value="${location.protocol.startsWith("http") ? esc(location.origin + location.pathname.replace(/[^/]*$/, "") + "feedback.html") : ""}">
           <input id="ejsTestTo" type="email" placeholder="Send the test to this email address" style="flex:1;min-width:220px">
           <button class="btn btn-gold btn-sm" id="ejsTestBtn" style="flex-shrink:0">Check &amp; Send Test Email</button>
         </div>
@@ -1270,6 +1281,17 @@ async function viewSettings(main) {
       const saved = (await Fs.getDoc(Fs.doc(db, "settings", "general"))).data() || {};
       if (svc && saved.emailjsServiceId === svc && saved.emailjsTemplateId === tpl && saved.emailjsPublicKey === key) good("These values are saved — the guest form is using them.");
       else bad("These values are <b>not saved yet</b>. The guest form only uses saved values — click <b>Save Branding &amp; Email Settings</b> (the button at the very bottom of this page).");
+      // 2b) is the guest form people actually open the NEW version?
+      const formUrl = val("ejsFormUrl");
+      if (formUrl) {
+        try {
+          const res = await fetch(formUrl + (formUrl.includes("?") ? "&" : "?") + "nocache=" + Date.now(), { cache: "no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const m = (await res.text()).match(/GFS_FORM_VERSION\s*=\s*(\d+)/);
+          if (m && +m[1] >= 3) good("Your live guest form (feedback.html) is the up-to-date version.");
+          else bad("Your <b>live guest form is an OLD version</b> — that is why new email names like <code>{{heard_about_us}}</code> stay empty. Upload the newest <b>feedback.html</b> to your website (replacing the old one), then reload it with Ctrl+F5 (on a phone, clear the browser's cache).");
+        } catch (e) { lines.push(`<div style="color:var(--amber)">⚠ Couldn't read the guest form at that address (${esc(e.message || e)}). Check the address, and make sure you uploaded the newest feedback.html.</div>`); }
+      } else lines.push(`<div style="color:var(--amber)">⚠ Type the web address of your guest form above so I can check it is the newest version.</div>`);
       // 3) locations
       const synced = await syncNotifyEmails();
       if (synced) good(`Updated the recipient list of ${synced} location(s) from your Email Destinations page.`);
@@ -1287,11 +1309,12 @@ async function viewSettings(main) {
           const res = await window.emailjs.send(svc, tpl, {
             to_email: to, email: to, to, recipient: to, subject: "TEST – New Guest Feedback – Sample Location – FB-TEST-000000",
             message: "This is a TEST email from your Guest Feedback system.\n\nIf you can read this, EmailJS is set up correctly.\n\nRATINGS\n• Service: Excellent\n• Food Quality: Average\n\nANSWERS\n• What did you like best?: The staff were wonderful.",
-            location_name: "Sample Location (TEST)", feedback_id: "FB-TEST-000000", date_of_visit: new Date().toISOString().slice(0, 10),
+            location_name: "Sample Location (TEST)", feedback_id: "FB-TEST-000000", date_of_visit: new Date().toISOString().slice(0, 10).split("-").reverse().join("-"),
             from_name: "Test Guest", name: "Test Guest", server_name: "Sample Server", recommendation: "Yes",
             rating_menu: "Excellent", rating_food: "Average", rating_service: "Excellent", rating_atmosphere: "Excellent", rating_value: "Average", rating_overall: "Excellent",
             liked_best: "The staff were wonderful.", improvement_suggestion: "-", guest_name: "Test Guest", guest_contact: "-", guest_email: "-",
             ratings_summary: "Service: Excellent, Food Quality: Average", answers_summary: "What did you like best?: The staff were wonderful.",
+            heard_about_us: "Friends", ...Object.fromEntries(state.questionnaire.fields.map((f) => ["answer_" + f.id, f.type === "rating" ? "Excellent" : "Sample answer"])),
           }, { publicKey: key });
           good(`EmailJS accepted the test email (status ${esc(res.status)}). Check the inbox of <b>${esc(to)}</b> — and its <b>Spam / Junk</b> folder — in the next minute.`);
         } catch (err) { bad("EmailJS did not send the test email."); lines.push(explainEmailJsError(err)); }
@@ -1319,6 +1342,7 @@ async function viewSettings(main) {
       <div class="card" style="padding:14px;margin-bottom:10px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
           <span class="badge gray">${i + 1}. ${TYPE_LABELS[f.type] || f.type}</span>
+          <span style="font-size:11.5px;color:var(--ink-soft)" title="Use this name in your EmailJS template to show the answer to this question">Email name: <code>{{answer_${esc(f.id)}}}</code></span>
           <label style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:13px;white-space:nowrap;margin:0;margin-inline-start:auto">
             <input type="checkbox" class="qReq" data-i="${i}" style="width:auto" ${f.required ? "checked" : ""}> Required
           </label>
