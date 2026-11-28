@@ -160,7 +160,8 @@ service cloud.firestore {
     match /auditLogs/{id} {
       allow read: if isAdmin();
       allow create: if isAdmin();
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
     match /counters/{id} {
       allow read: if true;
@@ -541,6 +542,61 @@ async function writeAudit(action, detail) {
   catch (e) { console.error("audit log failed", e); }
 }
 
+// ---------------------------------------------------------------------------
+// Bulk deletion helpers (used by the Feedback list and the Audit Log)
+// ---------------------------------------------------------------------------
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+function plainData(v) { // Firestore timestamps -> readable text, so a backup file is human-friendly
+  if (v && typeof v === "object") {
+    if (typeof v.toDate === "function") return v.toDate().toISOString();
+    if (Array.isArray(v)) return v.map(plainData);
+    const o = {}; for (const k in v) o[k] = plainData(v[k]); return o;
+  }
+  return v;
+}
+async function deleteDocsInBatches(coll, ids, progress) {
+  for (let i = 0; i < ids.length; i += 400) { // Firestore allows at most 500 changes per batch
+    const batch = Fs.writeBatch(db);
+    ids.slice(i, i + 400).forEach((id) => batch.delete(Fs.doc(db, coll, id)));
+    await batch.commit();
+    if (progress) progress(Math.min(i + 400, ids.length), ids.length);
+  }
+}
+// One confirmation window for every kind of deletion: states exactly what will be
+// deleted, optionally downloads a backup copy first, and makes large deletions
+// require typing DELETE.
+function confirmDeleteModal({ title, message, coll, count, requireTyping, backupFile, loadItems, onDone }) {
+  openModal(`
+    <h3 style="color:var(--red)">${esc(title)}</h3>
+    <p style="font-size:14px;line-height:1.5">${message}</p>
+    <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--ink);margin:12px 0"><input type="checkbox" id="cdBackup" style="width:auto" checked> Download a backup copy of these records first (recommended)</label>
+    ${requireTyping ? `<div class="field"><label>Type <b>DELETE</b> to confirm</label><input id="cdType" autocomplete="off" placeholder="DELETE"></div>` : ""}
+    <div id="cdStatus" style="font-size:13px;color:var(--ink-soft);min-height:18px"></div>
+    <div class="modal-actions"><button class="btn btn-outline" id="cdCancel">Cancel</button><button class="btn btn-danger" id="cdGo" ${requireTyping ? "disabled" : ""}>Delete ${count == null ? "everything" : plural(count, "record", "records")}</button></div>`);
+  const go = document.getElementById("cdGo"), status = document.getElementById("cdStatus");
+  if (requireTyping) document.getElementById("cdType").addEventListener("input", (e) => { go.disabled = e.target.value.trim() !== "DELETE"; });
+  document.getElementById("cdCancel").addEventListener("click", closeModal);
+  go.addEventListener("click", async () => {
+    go.disabled = true; document.getElementById("cdCancel").disabled = true; go.innerHTML = `<span class="spinner"></span> Working…`;
+    try {
+      status.textContent = "Collecting the records…";
+      const items = await loadItems(); // [{ id, data }]
+      if (!items.length) { closeModal(); return toast("There was nothing to delete.", "success"); }
+      if (document.getElementById("cdBackup").checked) {
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        downloadFile(`${backupFile}_deleted_${stamp}.json`, JSON.stringify(plainData(items.map((i) => ({ id: i.id, ...i.data }))), null, 2), "application/json");
+      }
+      await deleteDocsInBatches(coll, items.map((i) => i.id), (done, total) => { status.textContent = `Deleting… ${done} of ${total}`; });
+      await onDone(items.map((i) => i.id));
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      status.innerHTML = `<span style="color:var(--red)">Could not finish: ${esc(err.message || err)}</span>`;
+      go.disabled = false; go.textContent = "Try again"; document.getElementById("cdCancel").disabled = false;
+    }
+  });
+}
+
 const NAV = [
   { hash: "#/dashboard", label: "Dashboard", icon: "▤", roles: ["admin","user"] },
   { hash: "#/feedback", label: "Feedback", icon: "✉", roles: ["admin","user"] },
@@ -645,9 +701,12 @@ async function viewDashboard(main) {
 }
 
 // ---- Feedback list ------------------------------------------------------
-let fbCache = [], fbPage = 1, fbPageSize = 25;
+let fbCache = [], fbPage = 1, fbPageSize = 25, fbSelected = new Set();
 async function viewFeedbackList(main) {
   const locs = visibleLocations();
+  const isAdmin = state.role === "admin";
+  fbSelected = new Set();
+  let currentPageRows = [];
   main.innerHTML = `
     <div class="panel card">
       <div class="toolbar">
@@ -661,13 +720,19 @@ async function viewFeedbackList(main) {
         <button class="btn btn-outline btn-sm" id="fClear">Clear Filters</button>
         <button class="btn btn-gold btn-sm" id="fApply">Apply</button>
       </div>
-      <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-outline btn-sm" id="fPrint">Print List</button>
         <button class="btn btn-outline btn-sm" id="fCsv">Export CSV</button>
+        ${isAdmin ? `
+        <span style="width:1px;height:24px;background:var(--line)"></span>
+        <button class="btn btn-outline btn-sm" id="fSelMatching">Select all matching the filters</button>
+        <button class="btn btn-outline btn-sm" id="fSelNone">Clear selection</button>
+        <button class="btn btn-danger btn-sm" id="fDelSel" disabled>Delete selected (0)</button>
+        <button class="btn btn-outline btn-sm" id="fDelAll" style="color:var(--red);margin-left:auto">Delete ALL feedback…</button>` : ""}
       </div>
       <div class="table-scroll"><table>
-        <thead><tr><th>ID</th><th>Visit Date</th><th>Location</th><th>Server</th><th>Recommend</th><th>Overall</th><th>Guest</th><th>Submitted</th><th></th></tr></thead>
-        <tbody id="fbTbody"><tr><td colspan="9">Loading…</td></tr></tbody>
+        <thead><tr>${isAdmin ? `<th style="width:34px"><input type="checkbox" id="fSelAll" title="Select every record on this page" aria-label="Select all on this page" style="width:auto"></th>` : ""}<th>ID</th><th>Visit Date</th><th>Location</th><th>Server</th><th>Recommend</th><th>Overall</th><th>Guest</th><th>Submitted</th><th></th></tr></thead>
+        <tbody id="fbTbody"><tr><td colspan="${isAdmin ? 10 : 9}">Loading…</td></tr></tbody>
       </table></div>
       <div class="pager"><button class="btn btn-outline btn-sm" id="fPrev">Prev</button><span id="fPageLbl" style="font-size:13px;color:var(--ink-soft)"></span><button class="btn btn-outline btn-sm" id="fNext">Next</button></div>
     </div>`;
@@ -714,6 +779,13 @@ async function viewFeedbackList(main) {
       return true;
     });
   }
+  function updateSelUI() {
+    if (!isAdmin) return;
+    const n = fbSelected.size, btn = document.getElementById("fDelSel");
+    btn.disabled = n === 0; btn.textContent = `Delete selected (${n})`;
+    const all = document.getElementById("fSelAll");
+    all.checked = currentPageRows.length > 0 && currentPageRows.every((r) => fbSelected.has(r.feedbackId));
+  }
   function renderRows() {
     fbPageSize = Number(document.getElementById("fPageSize").value);
     const filtered = applyClientFilters(fbCache);
@@ -721,12 +793,60 @@ async function viewFeedbackList(main) {
     fbPage = Math.min(fbPage, totalPages);
     const startIdx = (fbPage-1)*fbPageSize;
     const pageRows = filtered.slice(startIdx, startIdx+fbPageSize);
+    currentPageRows = pageRows;
     document.getElementById("fbTbody").innerHTML = pageRows.length ? pageRows.map((r)=>`
-      <tr><td>${r.feedbackId}</td><td>${fmtDate(r.dateOfVisit)}</td><td>${esc(r.locationName)}</td><td>${esc(r.serverName||"-")}</td>
+      <tr>${isAdmin ? `<td><input type="checkbox" class="fSel" data-id="${esc(r.feedbackId)}" aria-label="Select ${esc(r.feedbackId)}" style="width:auto" ${fbSelected.has(r.feedbackId) ? "checked" : ""}></td>` : ""}<td>${r.feedbackId}</td><td>${fmtDate(r.dateOfVisit)}</td><td>${esc(r.locationName)}</td><td>${esc(r.serverName||"-")}</td>
       <td>${r.recommendation}</td><td><span class="rating-chip ${r.ratings?.overallExperience}">${r.ratings?.overallExperience||"-"}</span></td>
       <td>${esc(r.guestName||"-")}</td><td>${fmtDateTime(r.submittedAt)}</td><td><a href="#/feedback/${r.feedbackId}">View</a></td></tr>`).join("")
-      : `<tr><td colspan="9">No feedback matches your search criteria.</td></tr>`;
+      : `<tr><td colspan="${isAdmin ? 10 : 9}">No feedback matches your search criteria.</td></tr>`;
     document.getElementById("fPageLbl").textContent = `Page ${fbPage} of ${totalPages} (${filtered.length} records)`;
+    updateSelUI();
+  }
+
+  // ---- admin-only: select & delete ----
+  async function afterFeedbackDeleted(ids, note) {
+    const gone = new Set(ids);
+    fbCache = fbCache.filter((r) => !gone.has(r.feedbackId));
+    ids.forEach((id) => fbSelected.delete(id));
+    await writeAudit("Feedback deleted", `${plural(ids.length, "record", "records")}${note ? " (" + note + ")" : ""}: ${ids.slice(0, 25).join(", ")}${ids.length > 25 ? ", …" : ""}`);
+    toast(`${plural(ids.length, "feedback record", "feedback records")} deleted.`, "success");
+    renderRows();
+  }
+  if (isAdmin) {
+    document.getElementById("fbTbody").addEventListener("change", (e) => {
+      if (!e.target.classList.contains("fSel")) return;
+      e.target.checked ? fbSelected.add(e.target.dataset.id) : fbSelected.delete(e.target.dataset.id);
+      updateSelUI();
+    });
+    document.getElementById("fSelAll").addEventListener("change", (e) => {
+      currentPageRows.forEach((r) => e.target.checked ? fbSelected.add(r.feedbackId) : fbSelected.delete(r.feedbackId));
+      renderRows();
+    });
+    document.getElementById("fSelMatching").addEventListener("click", () => {
+      const rows = applyClientFilters(fbCache); rows.forEach((r) => fbSelected.add(r.feedbackId)); renderRows();
+      toast(`${plural(rows.length, "record", "records")} selected (across all pages).`, "success");
+    });
+    document.getElementById("fSelNone").addEventListener("click", () => { fbSelected.clear(); renderRows(); });
+    document.getElementById("fDelSel").addEventListener("click", () => {
+      const ids = [...fbSelected];
+      if (!ids.length) return;
+      confirmDeleteModal({
+        title: `Delete ${plural(ids.length, "selected record", "selected records")}?`,
+        message: `You are about to permanently delete <b>${plural(ids.length, "feedback record", "feedback records")}</b>. This cannot be undone.`,
+        coll: "feedback", count: ids.length, requireTyping: ids.length > 10, backupFile: "feedback",
+        loadItems: async () => ids.map((id) => fbCache.find((r) => r.feedbackId === id)).filter(Boolean).map((r) => ({ id: r.feedbackId, data: r })),
+        onDone: (deleted) => afterFeedbackDeleted(deleted),
+      });
+    });
+    document.getElementById("fDelAll").addEventListener("click", () => {
+      confirmDeleteModal({
+        title: "Delete ALL feedback?",
+        message: `This permanently deletes <b>every feedback record in the whole system</b> — for all locations and all dates, not just what is on screen. Locations, users, questions and settings are not touched. Feedback numbering keeps counting from where it was. <b>This cannot be undone.</b>`,
+        coll: "feedback", count: null, requireTyping: true, backupFile: "feedback_ALL",
+        loadItems: async () => (await Fs.getDocs(Fs.collection(db, "feedback"))).docs.map((d) => ({ id: d.id, data: d.data() })),
+        onDone: async (deleted) => { fbCache = []; fbSelected.clear(); await afterFeedbackDeleted(deleted, "ALL feedback"); },
+      });
+    });
   }
   document.getElementById("fApply").addEventListener("click", runQuery);
   document.getElementById("fSearch").addEventListener("input", renderRows);
@@ -1449,11 +1569,54 @@ async function viewSettings(main) {
 // ---- Audit Log ------------------------------------------------------
 async function viewAudit(main) {
   const snap = await Fs.getDocs(Fs.query(Fs.collection(db,"auditLogs"), Fs.orderBy("at","desc"), Fs.limit(200)));
-  const logs = snap.docs.map((d) => d.data());
-  main.innerHTML = `<div class="panel card"><h3>Audit Log</h3><div class="table-scroll"><table>
-    <thead><tr><th>Date/Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
-    <tbody>${logs.map((l)=>`<tr><td>${fmtDateTime(l.at)}</td><td>${esc(l.userEmail||l.userId)}</td><td>${esc(l.action)}</td><td>${esc(l.detail)}</td></tr>`).join("")||`<tr><td colspan="4">No audit entries yet.</td></tr>`}</tbody>
+  const logs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const sel = new Set();
+  main.innerHTML = `<div class="panel card"><h3>Audit Log</h3>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-outline btn-sm" id="aSelAll">Select all shown</button>
+      <button class="btn btn-outline btn-sm" id="aSelNone">Clear selection</button>
+      <button class="btn btn-danger btn-sm" id="aDelSel" disabled>Delete selected (0)</button>
+      <button class="btn btn-outline btn-sm" id="aDelAll" style="color:var(--red);margin-left:auto">Delete ALL audit entries…</button>
+    </div>
+    ${logs.length >= 200 ? `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:-4px">Showing the 200 most recent entries.</p>` : ""}
+    <div class="table-scroll"><table>
+    <thead><tr><th style="width:34px"><input type="checkbox" id="aChkAll" aria-label="Select all shown" style="width:auto"></th><th>Date/Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+    <tbody>${logs.map((l)=>`<tr><td><input type="checkbox" class="aSel" data-id="${esc(l.id)}" aria-label="Select entry" style="width:auto"></td><td>${fmtDateTime(l.at)}</td><td>${esc(l.userEmail||l.userId)}</td><td>${esc(l.action)}</td><td style="white-space:normal">${esc(l.detail)}</td></tr>`).join("")||`<tr><td colspan="5">No audit entries yet.</td></tr>`}</tbody>
   </table></div></div>`;
+
+  const refresh = () => {
+    document.querySelectorAll(".aSel").forEach((c) => { c.checked = sel.has(c.dataset.id); });
+    const b = document.getElementById("aDelSel"); b.disabled = sel.size === 0; b.textContent = `Delete selected (${sel.size})`;
+    document.getElementById("aChkAll").checked = logs.length > 0 && logs.every((l) => sel.has(l.id));
+  };
+  const finished = async (n, what) => {
+    await writeAudit("Audit log entries deleted", `${plural(n, "entry", "entries")} removed (${what})`);
+    toast(`${plural(n, "audit entry", "audit entries")} deleted.`, "success");
+    router();
+  };
+  document.querySelectorAll(".aSel").forEach((c) => c.addEventListener("change", () => { c.checked ? sel.add(c.dataset.id) : sel.delete(c.dataset.id); refresh(); }));
+  document.getElementById("aChkAll").addEventListener("change", (e) => { logs.forEach((l) => e.target.checked ? sel.add(l.id) : sel.delete(l.id)); refresh(); });
+  document.getElementById("aSelAll").addEventListener("click", () => { logs.forEach((l) => sel.add(l.id)); refresh(); });
+  document.getElementById("aSelNone").addEventListener("click", () => { sel.clear(); refresh(); });
+  document.getElementById("aDelSel").addEventListener("click", () => {
+    const ids = [...sel]; if (!ids.length) return;
+    confirmDeleteModal({
+      title: `Delete ${plural(ids.length, "selected audit entry", "selected audit entries")}?`,
+      message: `You are about to permanently delete <b>${plural(ids.length, "audit log entry", "audit log entries")}</b>. This cannot be undone. (A new entry recording this deletion will be added.)`,
+      coll: "auditLogs", count: ids.length, requireTyping: ids.length > 10, backupFile: "audit-log",
+      loadItems: async () => logs.filter((l) => sel.has(l.id)).map(({ id, ...data }) => ({ id, data })),
+      onDone: (deleted) => finished(deleted.length, "selected"),
+    });
+  });
+  document.getElementById("aDelAll").addEventListener("click", () => {
+    confirmDeleteModal({
+      title: "Delete ALL audit entries?",
+      message: `This permanently erases the <b>entire audit log</b> — the full history of who changed what, not just the entries on screen. <b>This cannot be undone.</b> (One new entry recording this deletion will remain.)`,
+      coll: "auditLogs", count: null, requireTyping: true, backupFile: "audit-log_ALL",
+      loadItems: async () => (await Fs.getDocs(Fs.collection(db, "auditLogs"))).docs.map((d) => ({ id: d.id, data: d.data() })),
+      onDone: (deleted) => finished(deleted.length, "ALL"),
+    });
+  });
 }
 </script>
 </body>
